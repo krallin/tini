@@ -29,6 +29,11 @@ pid_t spawn(char *const argv[]) {
 	}
 }
 
+void print_usage_and_exit(char *name, FILE *file, int status) {
+	fprintf(file, "Usage: %s [-h | program arg1 arg2]\n", name);
+	exit(status);
+}
+
 int main(int argc, char *argv[]) {
 	siginfo_t sig;
 
@@ -41,6 +46,35 @@ int main(int argc, char *argv[]) {
 	ts.tv_sec = 1;
 	ts.tv_nsec = 0;
 
+	char* name = argv[0];
+
+	/* Start with argument processing */
+	int c;
+	while ((c = getopt (argc, argv, "h")) != -1) {
+		switch (c) {
+			case 'h':
+				print_usage_and_exit(name, stdout, 0);
+				break;
+			case '?':
+				print_usage_and_exit(name, stderr, 1);
+				break;
+			default:
+				// Should never happen
+				abort();
+		}
+	}
+
+	int i;
+	char* child_args[argc-optind+1];
+	for (i = 0; i < argc - optind; i++) {
+		child_args[i] = argv[optind+i];
+	}
+	child_args[i] = NULL;
+
+	if (i == 0) {
+		print_usage_and_exit(name, stdout, 1);
+	}
+
 	/* Prepare signals */
 	if (sigfillset(&set)) {
 		perror("sigfillset");
@@ -52,7 +86,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Spawn the main command */
-	child_pid = spawn(argv+1);
+	child_pid = spawn(child_args);
 	printf("[INFO ] Spawned child process\n");
 
 	/* Loop forever:
@@ -104,7 +138,7 @@ int main(int argc, char *argv[]) {
 						printf("[INFO ] Main child has exited\n");
 						if (WIFEXITED(current_status)) {
 							// Our process exited normally.
-							printf("[DEBUG] Main child exited normally\n");
+							printf("[DEBUG] Main child exited normally (check exit status)\n");
 							return WEXITSTATUS(current_status);
 						} else if (WIFSIGNALED(current_status)) {
 							// Our process was terminated. Emulate what sh / bash
