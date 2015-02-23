@@ -10,26 +10,32 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define PRINT_FATAL(...)    fprintf(stderr, "[FATAL] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
+#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stderr, "[INFO ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stderr, "[DEBUG] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+
 static sigset_t set;
+static int verbosity = 0;
 
 pid_t spawn(char *const argv[]) {
 	pid_t pid;
 
 	pid = fork();
 	if (pid < 0) {
-		perror("[FATAL] Fork failed");
+		PRINT_FATAL("Fork failed: '%s'", strerror(errno));
 		_exit(1);
 	} else if (pid == 0) {
 		sigprocmask(SIG_UNBLOCK, &set, NULL);
 		execvp(argv[0], argv);
-		perror("[ERROR] Executing child process failed");
+		PRINT_FATAL("Executing child process failed: '%s'", strerror(errno));
 		_exit(1);
 	} else {
 		return pid;
 	}
 }
 
-void print_usage_and_exit(char *name, FILE *file, int status) {
+void print_usage_and_exit(const char *name, FILE *file, const int status) {
 	fprintf(file, "Usage: %s [-h | program arg1 arg2]\n", name);
 	exit(status);
 }
@@ -50,10 +56,13 @@ int main(int argc, char *argv[]) {
 
 	/* Start with argument processing */
 	int c;
-	while ((c = getopt (argc, argv, "h")) != -1) {
+	while ((c = getopt (argc, argv, "hv")) != -1) {
 		switch (c) {
 			case 'h':
 				print_usage_and_exit(name, stdout, 0);
+				break;
+			case 'v':
+				verbosity++;
 				break;
 			case '?':
 				print_usage_and_exit(name, stderr, 1);
@@ -78,17 +87,17 @@ int main(int argc, char *argv[]) {
 
 	/* Prepare signals */
 	if (sigfillset(&set)) {
-		perror("sigfillset");
+		PRINT_FATAL("sigfillset failed: '%s'", strerror(errno));
 		return 1;
 	}
 	if (sigprocmask(SIG_BLOCK, &set, NULL)) {
-		perror("sigprocmask");
+		PRINT_FATAL("Blocking signals failed: '%s'", strerror(errno));
 		return 1;
 	}
 
 	/* Spawn the main command */
 	child_pid = spawn(child_args);
-	printf("[INFO ] Spawned child process\n");
+	PRINT_INFO("Spawned child process");
 
 	/* Loop forever:
 	 * - Reap zombies
@@ -102,7 +111,7 @@ int main(int argc, char *argv[]) {
 				case EINTR:
 					break;
 				case EINVAL:
-					perror("[ERROR] Fatal!");
+					PRINT_INFO("EINVAL on sigtimedwait!");
 					return 2;
 			}
 		} else {
@@ -112,10 +121,10 @@ int main(int argc, char *argv[]) {
 					/* Special-cased, as we don't forward SIGCHLD. Instead, we'll
 					 * fallthrough to reaping processes.
 					 */
-					printf("[INFO ] Received SIGCHLD\n");
+					PRINT_DEBUG("Received SIGCHLD");
 					break;
 				default:
-					printf("[INFO ] Passing signal: %s\n", strsignal(sig.si_signo));
+					PRINT_DEBUG("Passing signal: '%s'", strsignal(sig.si_signo));
 					/* Forward anything else */
 					kill(child_pid, sig.si_signo);
 					break;
@@ -128,7 +137,7 @@ int main(int argc, char *argv[]) {
 			switch (current_pid) {
 				case -1:
 					/* An error occured. Print it and exit. */
-					perror("waitpids returned -1");
+					PRINT_FATAL("Error while waiting for pids: '%s'", strerror(errno));
 					return 1;
 				case 0:
 					/* No child to reap. We'll break out of the loop here. */
@@ -140,16 +149,16 @@ int main(int argc, char *argv[]) {
 					if (current_pid == child_pid) {
 						if (WIFEXITED(current_status)) {
 							/* Our process exited normally. */
-							printf("[DEBUG] Main child exited normally (check exit status)\n");
+							PRINT_INFO("Main child exited normally (check exit status)");
 							return WEXITSTATUS(current_status);
 						} else if (WIFSIGNALED(current_status)) {
 							/* Our process was terminated. Emulate what sh / bash
 							 * would do, which is to return 128 + signal number.
 							*/
-							printf("[DEBUG] Main child exited with signal\n");
+							PRINT_INFO("Main child exited with signal");
 							return 128 + WTERMSIG(current_status);
 						} else {
-							printf("[WARNING] Main child exited for unknown reason\n");
+							PRINT_WARNING("Main child exited for unknown reason");
 							return 1;
 						}
 					}
