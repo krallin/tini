@@ -49,6 +49,8 @@ int main(int argc, char *argv[]) {
 	pid_t current_pid;
 	int current_status;
 
+	int exit_code = -1;
+
 	struct timespec ts;
 	ts.tv_sec = 1;
 	ts.tv_nsec = 0;
@@ -137,33 +139,43 @@ int main(int argc, char *argv[]) {
 			current_pid = waitpid(-1, &current_status, WNOHANG);
 			switch (current_pid) {
 				case -1:
-					/* An error occured. Print it and exit. */
+					if (errno == ECHILD) {
+						// No childs to wait. Let's break out of the loop.
+						break;
+					}
+					/* An unknown error occured. Print it and exit. */
 					PRINT_FATAL("Error while waiting for pids: '%s'", strerror(errno));
 					return 1;
 				case 0:
 					/* No child to reap. We'll break out of the loop here. */
 					break;
 				default:
-					/* A child was reaped. Check whether it's the main one,
-					 * and go for another iteration otherwise.
+					/* A child was reaped. Check whether it's the main one. If it is, then
+					 * set the exit_code, which will cause us to exit once we've reaped everyone else.
 					 */
+					PRINT_DEBUG("Reaped child with pid: '%i'", current_pid);
 					if (current_pid == child_pid) {
 						if (WIFEXITED(current_status)) {
 							/* Our process exited normally. */
 							PRINT_INFO("Main child exited normally (with status '%i')", WEXITSTATUS(current_status));
-							return WEXITSTATUS(current_status);
+							exit_code = WEXITSTATUS(current_status);
 						} else if (WIFSIGNALED(current_status)) {
 							/* Our process was terminated. Emulate what sh / bash
 							 * would do, which is to return 128 + signal number.
 							*/
 							PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(WTERMSIG(current_status)));
-							return 128 + WTERMSIG(current_status);
+							exit_code = 128 + WTERMSIG(current_status);
 						} else {
 							PRINT_FATAL("Main child exited for unknown reason!");
 							return 1;
 						}
 					}
 					continue;
+			}
+
+			/* If exit_code is not equal to -1, then we're exiting because our main child has exited */
+			if (exit_code != -1 ) {
+				return exit_code;
 			}
 
 			/* If we make it here, that's because we did not continue in the switch case. */
