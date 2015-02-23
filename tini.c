@@ -15,10 +15,9 @@
 #define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stderr, "[INFO ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 #define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stderr, "[DEBUG] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 
-static sigset_t set;
 static int verbosity = 0;
 
-pid_t spawn(char *const argv[]) {
+pid_t spawn(sigset_t set, char *const argv[]) {
 	pid_t pid;
 
 	pid = fork();
@@ -53,6 +52,8 @@ int main(int argc, char *argv[]) {
 	struct timespec ts;
 	ts.tv_sec = 1;
 	ts.tv_nsec = 0;
+
+	sigset_t set;
 
 	/* Start with argument processing */
 	int c;
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Spawn the main command */
-	child_pid = spawn(child_args);
+	child_pid = spawn(set, child_args);
 	PRINT_INFO("Spawned child process");
 
 	/* Loop forever:
