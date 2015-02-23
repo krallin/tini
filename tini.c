@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
 	child_args[i] = NULL;
 
 	if (i == 0) {
+		// User forgot to provide args!
 		print_usage_and_exit(name, stdout, 1);
 	}
 
