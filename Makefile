@@ -10,6 +10,9 @@ $(BIN): $(OBJ)
 
 $(OBJ):
 
+check:
+	python test/test.py
+
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f $(BIN) $(DESTDIR)$(PREFIX)/bin
