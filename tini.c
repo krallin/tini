@@ -35,6 +35,8 @@ void print_usage_and_exit(char *name, FILE *file, int status) {
 }
 
 int main(int argc, char *argv[]) {
+	char* name = argv[0];
+
 	siginfo_t sig;
 
 	pid_t child_pid;
@@ -45,8 +47,6 @@ int main(int argc, char *argv[]) {
 	struct timespec ts;
 	ts.tv_sec = 1;
 	ts.tv_nsec = 0;
-
-	char* name = argv[0];
 
 	/* Start with argument processing */
 	int c;
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 				print_usage_and_exit(name, stderr, 1);
 				break;
 			default:
-				// Should never happen
+				/* Should never happen */
 				abort();
 		}
 	}
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 	child_args[i] = NULL;
 
 	if (i == 0) {
-		// User forgot to provide args!
+		/* User forgot to provide args! */
 		print_usage_and_exit(name, stdout, 1);
 	}
 
@@ -109,13 +109,14 @@ int main(int argc, char *argv[]) {
 			/* There is a signal to handle here */
 			switch (sig.si_signo) {
 				case SIGCHLD:
-					// Special-cased, as we don't forward SIGCHLD. Instead, we'll
-					// fallthrough to reaping processes.
+					/* Special-cased, as we don't forward SIGCHLD. Instead, we'll
+					 * fallthrough to reaping processes.
+					 */
 					printf("[INFO ] Received SIGCHLD\n");
 					break;
 				default:
 					printf("[INFO ] Passing signal: %s\n", strsignal(sig.si_signo));
-					// Forward anything else
+					/* Forward anything else */
 					kill(child_pid, sig.si_signo);
 					break;
 			}
@@ -126,24 +127,25 @@ int main(int argc, char *argv[]) {
 			current_pid = waitpid(-1, &current_status, WNOHANG);
 			switch (current_pid) {
 				case -1:
-					// An error occured. Print it and exit.
+					/* An error occured. Print it and exit. */
 					perror("waitpids returned -1");
 					return 1;
 				case 0:
-					// No child to reap. We'll break out of the loop here.
+					/* No child to reap. We'll break out of the loop here. */
 					break;
 				default:
-					// A child was reaped. Check whether it's the main one,
-					// and go for another iteration otherwise.
+					/* A child was reaped. Check whether it's the main one,
+					 * and go for another iteration otherwise.
+					 */
 					if (current_pid == child_pid) {
-						printf("[INFO ] Main child has exited\n");
 						if (WIFEXITED(current_status)) {
-							// Our process exited normally.
+							/* Our process exited normally. */
 							printf("[DEBUG] Main child exited normally (check exit status)\n");
 							return WEXITSTATUS(current_status);
 						} else if (WIFSIGNALED(current_status)) {
-							// Our process was terminated. Emulate what sh / bash
-							// would do, which is to return 128 + signal number.
+							/* Our process was terminated. Emulate what sh / bash
+							 * would do, which is to return 128 + signal number.
+							*/
 							printf("[DEBUG] Main child exited with signal\n");
 							return 128 + WTERMSIG(current_status);
 						} else {
@@ -154,8 +156,7 @@ int main(int argc, char *argv[]) {
 					continue;
 			}
 
-			// If we make it here, that's because we did not continue in
-			// the switch case.
+			/* If we make it here, that's because we did not continue in the switch case. */
 			break;
 		}
 
