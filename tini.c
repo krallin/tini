@@ -150,16 +150,16 @@ int main(int argc, char *argv[]) {
 					if (current_pid == child_pid) {
 						if (WIFEXITED(current_status)) {
 							/* Our process exited normally. */
-							PRINT_INFO("Main child exited normally (check exit status)");
+							PRINT_INFO("Main child exited normally (with status '%i')", WEXITSTATUS(current_status));
 							return WEXITSTATUS(current_status);
 						} else if (WIFSIGNALED(current_status)) {
 							/* Our process was terminated. Emulate what sh / bash
 							 * would do, which is to return 128 + signal number.
 							*/
-							PRINT_INFO("Main child exited with signal");
+							PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(WTERMSIG(current_status)));
 							return 128 + WTERMSIG(current_status);
 						} else {
-							PRINT_WARNING("Main child exited for unknown reason");
+							PRINT_FATAL("Main child exited for unknown reason!");
 							return 1;
 						}
 					}
