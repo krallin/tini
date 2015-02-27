@@ -13,7 +13,7 @@ Using Tini
 
 Add Tini to your container, and make it executable.
 
-It's a very small file (10KB range). All Tini depends on is libc.
+Tini is a very small file (in the 10KB range), and all it depends on is `libc`.
 
 Once you've added Tini, use it like so:
 
@@ -40,8 +40,8 @@ Besides, Tini will reap potential zombie processes every second.
 Debugging
 ---------
 
-If something isn't just like you expect, consider increasing the verbosity
-level (up to 3):
+If something isn't working just like you expect, consider increasing the
+verbosity level (up to 3):
 
     tini -v   -- bash -c 'exit 1'
     tini -vv  -- true
