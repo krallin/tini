@@ -15,9 +15,14 @@
 #define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stderr, "[INFO ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 #define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stderr, "[DEBUG] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 
+#define ARRAY_LEN(x)  (sizeof(x) / sizeof(x[0]))
+
+
 static int verbosity = 0;
 
-pid_t spawn(sigset_t set, char *const argv[]) {
+
+pid_t spawn(sigset_t *child_sigset_ptr, char (*argv[])) {
+	/* TODO - Don't exit here! */
 	pid_t pid;
 
 	pid = fork();
@@ -25,23 +30,95 @@ pid_t spawn(sigset_t set, char *const argv[]) {
 		PRINT_FATAL("Fork failed: '%s'", strerror(errno));
 		_exit(1);
 	} else if (pid == 0) {
-		sigprocmask(SIG_UNBLOCK, &set, NULL);
+		// Child
+		if (sigprocmask(SIG_SETMASK, child_sigset_ptr, NULL)) {
+			PRINT_FATAL("Setting child signal mask failed: '%s'", strerror(errno));
+			_exit(1);
+		}
 		execvp(argv[0], argv);
 		PRINT_FATAL("Executing child process failed: '%s'", strerror(errno));
 		_exit(1);
 	} else {
+		// Parent
+		PRINT_INFO("Spawned child process '%s' with pid '%d'", argv[0], pid);
 		return pid;
 	}
 }
 
-void print_usage_and_exit(const char *name, FILE *file, const int status) {
+
+void print_usage(const char *name, FILE *file, const int status) {
 	fprintf(file, "Usage: %s [-h | program arg1 arg2]\n", name);
-	exit(status);
 }
 
-int main(int argc, char *argv[]) {
+
+int parse_args(int argc, char *argv[], char* (**child_args_ptr_ptr)[]) {
 	char* name = argv[0];
 
+	int c;
+	while ((c = getopt (argc, argv, "hv")) != -1) {
+		switch (c) {
+			case 'h':
+				print_usage(name, stdout, 0);
+				return 1;
+			case 'v':
+				verbosity++;
+				return 1;
+			case '?':
+				print_usage(name, stderr, 1);
+				return 1;
+			default:
+				/* Should never happen */
+				return 1;
+		}
+	}
+
+	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
+	if (*child_args_ptr_ptr == NULL) {
+		PRINT_FATAL("Failed to allocate memory for child_args_ptr_ptr: '%s'", strerror(errno));
+		return 1;
+	}
+
+	int i;
+	for (i = 0; i < argc - optind; i++) {
+		(**child_args_ptr_ptr)[i] = argv[optind+i];
+	}
+	(**child_args_ptr_ptr)[i] = NULL;
+
+	if (i == 0) {
+		/* User forgot to provide args! */
+		print_usage(name, stdout, 1);
+		return 1;
+	}
+
+	return 0;
+}
+
+int prepare_sigmask(sigset_t *parent_sigset_ptr, sigset_t *child_sigset_ptr) {
+	/* Prepare signals to block; make sure we don't block program error signals. */
+	if (sigfillset(parent_sigset_ptr)) {
+		PRINT_FATAL("sigfillset failed: '%s'", strerror(errno));
+		return 1;
+	}
+
+	int i;
+	int ignore_signals[] = {SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGABRT, SIGIOT, SIGTRAP, SIGEMT, SIGSYS} ;
+	for (i = 0; i < ARRAY_LEN(ignore_signals); i++) {
+		if (sigdelset(parent_sigset_ptr, ignore_signals[i])) {
+			PRINT_FATAL("sigdelset failed: '%d'", ignore_signals[i]);
+			return 1;
+		}
+	}
+
+	if (sigprocmask(SIG_SETMASK, parent_sigset_ptr, child_sigset_ptr)) {
+		PRINT_FATAL("sigprocmask failed: '%s'", strerror(errno));
+		return 1;
+	}
+
+	return 0;
+}
+
+
+int main(int argc, char *argv[]) {
 	siginfo_t sig;
 
 	pid_t child_pid;
@@ -55,66 +132,34 @@ int main(int argc, char *argv[]) {
 	ts.tv_sec = 1;
 	ts.tv_nsec = 0;
 
-	sigset_t set;
-
-	/* Start with argument processing */
-	int c;
-	while ((c = getopt (argc, argv, "hv")) != -1) {
-		switch (c) {
-			case 'h':
-				print_usage_and_exit(name, stdout, 0);
-				break;
-			case 'v':
-				verbosity++;
-				break;
-			case '?':
-				print_usage_and_exit(name, stderr, 1);
-				break;
-			default:
-				/* Should never happen */
-				abort();
-		}
-	}
-
-	int i;
-	char* child_args[argc-optind+1];
-	for (i = 0; i < argc - optind; i++) {
-		child_args[i] = argv[optind+i];
-	}
-	child_args[i] = NULL;
-
-	if (i == 0) {
-		/* User forgot to provide args! */
-		print_usage_and_exit(name, stdout, 1);
-	}
-
-	/* Prepare signals */
-	if (sigfillset(&set)) {
-		PRINT_FATAL("sigfillset failed: '%s'", strerror(errno));
-		return 1;
-	}
-	if (sigprocmask(SIG_BLOCK, &set, NULL)) {
-		PRINT_FATAL("Blocking signals failed: '%s'", strerror(errno));
+	/* Prepare sigmask */
+	sigset_t parent_sigset;
+	sigset_t child_sigset;
+	if (prepare_sigmask(&parent_sigset, &child_sigset)) {
 		return 1;
 	}
 
 	/* Spawn the main command */
-	child_pid = spawn(set, child_args);
-	PRINT_INFO("Spawned child process");
+	char* (*child_args_ptr)[];
+	if (parse_args(argc, argv, &child_args_ptr)) {
+		return 1;
+	}
+	child_pid = spawn(&child_sigset, *child_args_ptr);
+	free(child_args_ptr);
 
 	/* Loop forever:
 	 * - Reap zombies
 	 * - Forward signals
 	 */
 	while (1) {
-		if (sigtimedwait(&set, &sig, &ts) == -1) {
+		if (sigtimedwait(&parent_sigset, &sig, &ts) == -1) {
 			switch (errno) {
 				case EAGAIN:
 					break;
 				case EINTR:
 					break;
 				case EINVAL:
-					PRINT_INFO("EINVAL on sigtimedwait!");
+					PRINT_FATAL("EINVAL on sigtimedwait!");
 					return 2;
 			}
 		} else {
