@@ -258,7 +258,6 @@ int main(int argc, char *argv[]) {
 
 		/* Now, reap zombies */
 		if (reap_zombies(child_pid, &child_exitcode)) {
-			// Oops!
 			return 1;
 		}
 
