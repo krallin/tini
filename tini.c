@@ -84,7 +84,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
 	if (*child_args_ptr_ptr == NULL) {
-		PRINT_FATAL("Failed to allocate memory for child_args_ptr_ptr: '%s'", strerror(errno));
+		PRINT_FATAL("Failed to allocate memory for child args: '%s'", strerror(errno));
 		return 1;
 	}
 
