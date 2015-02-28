@@ -11,6 +11,7 @@ $(BIN): $(OBJ)
 $(OBJ):
 
 check:
+	docker build -t tini .
 	python test/test.py
 
 install: all

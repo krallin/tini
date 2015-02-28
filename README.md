@@ -41,8 +41,9 @@ Debugging
 ---------
 
 If something isn't working just like you expect, consider increasing the
-verbosity level (up to 3):
+verbosity level (up to 4):
 
-    tini -v   -- bash -c 'exit 1'
-    tini -vv  -- true
-    tini -vvv -- pwd
+    tini -v    -- bash -c 'exit 1'
+    tini -vv   -- true
+    tini -vvv  -- pwd
+    tini -vvvv -- ls
