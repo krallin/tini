@@ -152,7 +152,14 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 			default:
 				PRINT_DEBUG("Passing signal: '%s'", strsignal(sig.si_signo));
 				/* Forward anything else */
-				kill(child_pid, sig.si_signo);   // TODO - Check retcode!
+				if (kill(child_pid, sig.si_signo)) {
+					if (errno == ESRCH) {
+						PRINT_WARNING("Child was dead when forwarding signal");
+					} else {
+						PRINT_FATAL("Unexpected error when forwarding signal: '%s'", strerror(errno));
+						return 1;
+					}
+				}
 				break;
 		}
 	}
