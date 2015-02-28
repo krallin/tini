@@ -25,27 +25,27 @@ static int verbosity = 0;
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
 
-pid_t spawn(const sigset_t* const child_sigset_ptr, char (*argv[])) {
-	/* TODO - Don't exit here! */
+int spawn(const sigset_t* const child_sigset_ptr, char (*argv[]), int* const child_pid_ptr) {
 	pid_t pid;
 
 	pid = fork();
 	if (pid < 0) {
 		PRINT_FATAL("Fork failed: '%s'", strerror(errno));
-		_exit(1);
+		return 1;
 	} else if (pid == 0) {
 		// Child
 		if (sigprocmask(SIG_SETMASK, child_sigset_ptr, NULL)) {
 			PRINT_FATAL("Setting child signal mask failed: '%s'", strerror(errno));
-			_exit(1);
+			return 1;
 		}
 		execvp(argv[0], argv);
 		PRINT_FATAL("Executing child process '%s' failed: '%s'", argv[0], strerror(errno));
-		_exit(1);
+		return 1;
 	} else {
 		// Parent
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
-		return pid;
+		*child_pid_ptr = pid;
+		return 0;
 	}
 }
 
@@ -56,10 +56,6 @@ void print_usage(char* const name, FILE* const file) {
 
 
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
-	/*
-	 * Returns with 0 to indicate success, a positive value to indicate the process
-	 * should exit with success, and -1 to indicate it should exit with a failure.
-	 */
 	char* name = argv[0];
 
 	int c;
@@ -168,12 +164,6 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 }
 
 int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
-	/*
-	 * Returns:
-	 *   + = 0: The iteration completed successfully, but the child is still alive.
-	 *   + > 0: The iteration completed successfully, and the child was reaped.
-	 *   + < 0: An error occured
-	 */
 	pid_t current_pid;
 	int current_status;
 
@@ -188,7 +178,7 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 					break;
 				}
 				PRINT_FATAL("Error while waiting for pids: '%s'", strerror(errno));
-				return -1;
+				return 1;
 
 			case 0:
 				PRINT_TRACE("No child to reap.");
@@ -212,7 +202,7 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 						*child_exitcode_ptr = 128 + WTERMSIG(current_status);
 					} else {
 						PRINT_FATAL("Main child exited for unknown reason!");
-						return -1;
+						return 1;
 					}
 				}
 
@@ -230,8 +220,10 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
-	int child_exitcode = -1;
-	int parse_exitcode = 1;  // By default, we exit with 1 if parsing fails
+
+	// Those are passed to functions to get an exitcode back.
+	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
+	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
 
 	/* Prepare sigmask */
 	sigset_t parent_sigset;
@@ -247,7 +239,9 @@ int main(int argc, char *argv[]) {
 		return parse_exitcode;
 	}
 
-	child_pid = spawn(&child_sigset, *child_args_ptr);
+	if (spawn(&child_sigset, *child_args_ptr, &child_pid)) {
+		return 1;
+	}
 	free(child_args_ptr);
 
 	while (1) {

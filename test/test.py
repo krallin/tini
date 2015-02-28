@@ -83,5 +83,5 @@ if __name__ == "__main__":
 
     # Exit code test
     c = Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
-    c = Command(base_cmd + ["zzzz"], fail_cmd).run(retcode=1)
+    c = Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
     c = Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)

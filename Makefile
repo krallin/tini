@@ -32,4 +32,4 @@ clean:
 	rm -f $(BIN) $(OBJ) tini-$(VERSION).tar.gz
 
 .PHONY:
-	all install uninstall dist clean
+	all install uninstall dist clean check
