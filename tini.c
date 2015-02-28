@@ -136,9 +136,9 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 				break;
 			case EINTR:
 				break;
-			case EINVAL:
-				PRINT_FATAL("EINVAL on sigtimedwait!");
-				return -1;
+			default:
+				PRINT_FATAL("Unexpected error in sigtimedwait: '%s'", strerror(errno));
+				return 1;
 		}
 	} else {
 		/* There is a signal to handle here */
