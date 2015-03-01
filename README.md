@@ -77,6 +77,11 @@ After spawning your process, Tini will wait for signals and forward those
 to the child process, and periodically reap zombie processes that may be
 created within your container.
 
+When the "first" child process exits (`/your/program` in the examples above),
+Tini exits as well, with the exit code of the child process (so you can
+check your container's exit code to know whether the child exited
+successfully).
+
 
 Debugging
 ---------
