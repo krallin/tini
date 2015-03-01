@@ -44,7 +44,7 @@ Tini can also be used with an existing entrypoint in your container!
 
 Assuming your entrypoint was `/docker-entrypoint.sh`, then you would use:
 
-    ENTRYPOINT ["/tini", "--", "docker-entrypoint.sh"]
+    ENTRYPOINT ["/tini", "--", "/docker-entrypoint.sh"]
 
 
 ### Statically-Linked Version ###
