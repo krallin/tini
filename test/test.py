@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import pipes
 import subprocess
 import threading
 
@@ -14,8 +15,8 @@ class Command(object):
         self.post_delay = post_delay
         self.proc = None
 
-    def run(self, timeout=None, retcode=None):
-        print "Testing...", self.cmd,
+    def run(self, timeout=None, retcode=0):
+        print "Testing '{0}'...".format(" ".join(pipes.quote(s) for s in self.cmd)),
         sys.stdout.flush()
 
         err = None
@@ -23,7 +24,7 @@ class Command(object):
 
         def target():
             self.proc = subprocess.Popen(self.cmd, **pipe_kwargs)
-            self.proc.communicate()
+            self.stdout, self.stderr = self.proc.communicate()
 
         thread = threading.Thread(target=target)
         thread.start()
@@ -39,15 +40,15 @@ class Command(object):
             subprocess.check_call(self.fail_cmd, **pipe_kwargs)
             err =  Exception("Test failed with timeout!")
 
-        elif retcode is not None and self.proc.returncode != retcode:
+        elif self.proc.returncode != retcode:
             err =  Exception("Test failed with unexpected returncode (expected {0}, got {1})".format(retcode, self.proc.returncode))
 
         if err is not None:
             print "FAIL"
             print "--- STDOUT ---"
-            print out
+            print self.stdout
             print "--- STDERR ---"
-            print err
+            print self.stderr
             print "--- ... ---"
             raise err
         else:
@@ -85,6 +86,6 @@ if __name__ == "__main__":
         ).run(timeout=10, retcode=retcode)
 
     # Exit code test
-    c = Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
-    c = Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
-    c = Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
+    Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
+    Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
+    Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
