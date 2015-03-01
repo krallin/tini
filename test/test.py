@@ -61,34 +61,35 @@ if __name__ == "__main__":
 
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    # Tests rely on exiting fast enough (exiting at all, in fact).
-    base_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "--name={0}".format(name),
-        img,
-        "-vvvv",
-    ]
+    for entrypoint in ["/tini/tini", "/tini/tini-static"]:
+        base_cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "--name={0}".format(name),
+            "--entrypoint={0}".format(entrypoint),
+            img,
+            "-vvvv",
+        ]
 
-    fail_cmd = ["docker", "kill", name]
+        fail_cmd = ["docker", "kill", name]
 
-    # Reaping test
-    Command(base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
+        # Reaping test
+        Command(base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
 
-    # Signals test
-    for sig, retcode in [("INT", 1), ("TERM", 143)]:
-        Command(
-            base_cmd + ["--", "/tini/test/signals/test.py"],
-            fail_cmd,
-            ["docker", "kill", "-s", sig, name],
-            2
-        ).run(timeout=10, retcode=retcode)
+        # Signals test
+        for sig, retcode in [("INT", 1), ("TERM", 143)]:
+            Command(
+                base_cmd + ["--", "/tini/test/signals/test.py"],
+                fail_cmd,
+                ["docker", "kill", "-s", sig, name],
+                2
+            ).run(timeout=10, retcode=retcode)
 
-    # Exit code test
-    Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
-    Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
-    Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
+        # Exit code test
+        Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
+        Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
+        Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
 
-    # Valgrind test
-    Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/tini", "-v", "--", "ls"], fail_cmd).run()
+        # Valgrind test
+        Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/tini", "-v", "--", "ls"], fail_cmd).run()

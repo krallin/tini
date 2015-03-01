@@ -15,4 +15,5 @@ BIN="tini"
 docker build -t "${IMG}" .
 docker run -it --name="${NAME}" "${IMG}" true "-h"
 docker cp "${NAME}:/tini/${BIN}" "${DIST_DIR}"
+docker cp "${NAME}:/tini/${BIN}-static" "${DIST_DIR}"
 docker rm "${NAME}"

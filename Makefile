@@ -3,10 +3,13 @@ include config.mk
 OBJ = tini.o
 BIN = tini
 
-all: $(BIN)
+all: $(BIN) $(BIN)-static
 
 $(BIN): $(OBJ)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+$(BIN)-static: $(OBJ)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -static -o $@ $<
 
 $(OBJ):
 
