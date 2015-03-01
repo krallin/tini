@@ -13,7 +13,6 @@ NAME="${IMG}-dist"
 BIN="tini"
 
 docker build -t "${IMG}" .
-
-docker run -it --name="${NAME}" --entrypoint="bash" --workdir="/tini" "${IMG}" "-c" "make clean && make"
+docker run -it --name="${NAME}" --entrypoint="true" "${IMG}" true
 docker cp "${NAME}:/tini/${BIN}" "${DIST_DIR}"
 docker rm "${NAME}"
