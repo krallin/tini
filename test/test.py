@@ -89,3 +89,6 @@ if __name__ == "__main__":
     Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
     Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
     Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
+
+    # Valgrind test
+    Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/tini", "-v", "--", "ls"], fail_cmd).run()
