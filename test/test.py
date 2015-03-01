@@ -55,6 +55,9 @@ class Command(object):
 
 
 if __name__ == "__main__":
+    img = sys.argv[1]
+    name = "{0}-test".format(img)
+
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
     # Tests rely on exiting fast enough (exiting at all, in fact).
@@ -62,12 +65,12 @@ if __name__ == "__main__":
         "docker",
         "run",
         "--rm",
-        "--name=tini-test",
-        "tini",
+        "--name={0}".format(name),
+        img,
         "-vvvv",
     ]
 
-    fail_cmd = ["docker", "kill", "tini-test"]
+    fail_cmd = ["docker", "kill", name]
 
     # Reaping test
     Command(base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
@@ -77,7 +80,7 @@ if __name__ == "__main__":
         Command(
             base_cmd + ["--", "/tini/test/signals/test.py"],
             fail_cmd,
-            ["docker", "kill", "-s", sig, "tini-test"],
+            ["docker", "kill", "-s", sig, name],
             2
         ).run(timeout=10, retcode=retcode)
 

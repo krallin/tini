@@ -10,10 +10,6 @@ $(BIN): $(OBJ)
 
 $(OBJ):
 
-check:
-	docker build -t tini .
-	python test/test.py
-
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f $(BIN) $(DESTDIR)$(PREFIX)/bin
