@@ -1,4 +1,4 @@
-VERSION=0.2.0
+VERSION=0.3.0
 GIT_REV=$(shell git log -n 1 --date=local --pretty=format:"%h")
 
 # paths
