@@ -13,9 +13,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-#ifndef TINI_VERSION
-#define TINI_VERSION "???"
-#endif
+#include "tiniConfig.h"
 
 #define PRINT_FATAL(...)    fprintf(stderr, "[FATAL] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
@@ -56,7 +54,7 @@ int spawn(const sigset_t* const child_sigset_ptr, char (*argv[]), int* const chi
 
 
 void print_usage(char* const name, FILE* const file) {
-	fprintf(file, "%s (version %s)\n", basename(name), TINI_VERSION);
+	fprintf(file, "%s (version %s - %s)\n", basename(name), TINI_VERSION, TINI_GIT);
 	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
 	fprintf(file, "  -h: Show this help message and exit.\n");
