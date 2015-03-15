@@ -17,7 +17,8 @@ docker build -t "${IMG}" .
 # Smoke test
 docker run -it --rm --entrypoint="/tini/${BIN}" "${IMG}" "-h" "--" "true"
 
-# Copy the binary
+# Copy the binary and generated README
 docker run -it --entrypoint="/bin/true" --name="${NAME}" "${IMG}"
 docker cp "${NAME}:/tini/${BIN}" "${DIST_DIR}"
+docker cp "${NAME}:/tini/README.md" "${HERE}"
 docker rm "${NAME}"

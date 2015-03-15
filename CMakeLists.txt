@@ -19,6 +19,11 @@ configure_file (
 	"${PROJECT_BINARY_DIR}/tiniConfig.h"
 )
 
+configure_file (
+	"${PROJECT_SOURCE_DIR}/README.md.in"
+	"${PROJECT_SOURCE_DIR}/README.md"
+)
+
 include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini tini.c)
