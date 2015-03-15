@@ -20,7 +20,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.3.2
+    ENV TINI_VERSION v0.3.3
     ADD https://github.com/krallin/tini/releases/download//tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
