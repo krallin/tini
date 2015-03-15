@@ -1,6 +1,8 @@
 Tini - A tiny but valid `init` for containers
 =============================================
 
+[![Build Status](https://travis-ci.org/krallin/tini.svg?branch=master)](https://travis-ci.org/krallin/tini)
+
 Tini is the simplest `init` you could think of.
 
 All Tini does is spawn a single child (Tini is meant to be run in a container),
