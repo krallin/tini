@@ -15,7 +15,7 @@ set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions 
 # Build
 
 configure_file (
-	"${PROJECT_SOURCE_DIR}/tiniConfig.h.in"
+	"${PROJECT_SOURCE_DIR}/src/tiniConfig.h.in"
 	"${PROJECT_BINARY_DIR}/tiniConfig.h"
 )
 
@@ -26,4 +26,4 @@ configure_file (
 
 include_directories ("${PROJECT_BINARY_DIR}")
 
-add_executable (tini tini.c)
+add_executable (tini src/tini.c)
