@@ -6,11 +6,10 @@ REL_HERE=$(dirname "${BASH_SOURCE}")
 HERE=$(cd "${REL_HERE}"; pwd)
 
 IMG="tini"
-NAME="${IMG}-dist"
+SRC="/tini"
 
+# Create the build image
 docker build -t "${IMG}" .
 
-# Copy the generated README
-docker run -it --entrypoint="/bin/true" --name="${NAME}" "${IMG}"
-docker cp "${NAME}:/tini/README.md" "${HERE}"
-docker rm "${NAME}"
+# Run the build
+docker run --rm --volume="${HERE}:${SRC}" -e BUILD_DIR=/tmp/tini-build -e SOURCE_DIR="${SRC}" "${IMG}" "${SRC}/ci/run_build.sh"

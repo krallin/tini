@@ -61,11 +61,12 @@ if __name__ == "__main__":
 
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    for entrypoint in ["/tini/tini"]:
+    for entrypoint in ["/tini/dist/tini"]:
         base_cmd = [
             "docker",
             "run",
             "--rm",
+            "--volume={0}:/tini".format(root),
             "--name={0}".format(name),
             "--entrypoint={0}".format(entrypoint),
             img,
@@ -92,4 +93,4 @@ if __name__ == "__main__":
         Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
 
         # Valgrind test
-        Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/tini", "-v", "--", "ls"], fail_cmd).run()
+        Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", entrypoint, "-v", "--", "ls"], fail_cmd).run()
