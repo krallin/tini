@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-    for entrypoint in ["/tini/tini", "/tini/tini-static"]:
+    for entrypoint in ["/tini/tini"]:
         base_cmd = [
             "docker",
             "run",

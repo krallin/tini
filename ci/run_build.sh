@@ -11,7 +11,7 @@ make
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
 
 # Success
-for tini in ./tini ./tini-static; do
+for tini in ./tini; do
   echo "Testing $tini with: true"
   $tini -vvvv true
 

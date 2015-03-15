@@ -14,12 +14,10 @@ BIN="tini"
 
 docker build -t "${IMG}" .
 
-# Smoke tests
+# Smoke test
 docker run -it --rm --entrypoint="/tini/${BIN}" "${IMG}" "-h" "--" "true"
-docker run -it --rm --entrypoint="/tini/${BIN}-static" "${IMG}" "-h" "--" "true"
 
-# Copy the binaries
+# Copy the binary
 docker run -it --entrypoint="/bin/true" --name="${NAME}" "${IMG}"
 docker cp "${NAME}:/tini/${BIN}" "${DIST_DIR}"
-docker cp "${NAME}:/tini/${BIN}-static" "${DIST_DIR}"
 docker rm "${NAME}"

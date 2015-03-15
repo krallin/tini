@@ -22,6 +22,3 @@ configure_file (
 include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini tini.c)
-
-add_executable (tini-static tini.c)
-set_target_properties (tini-static PROPERTIES LINK_FLAGS "-static")
