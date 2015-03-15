@@ -7,6 +7,6 @@ RUN apt-get update \
 ADD . /tini
 WORKDIR /tini
 
-RUN cmake . && make clean && make
+RUN ./ci/run_build.sh
 
 ENTRYPOINT ["/tini/tini"]
