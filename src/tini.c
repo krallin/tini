@@ -28,7 +28,7 @@ static int verbosity = 0;
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
 
-int spawn(const sigset_t* const child_sigset_ptr, char (*argv[]), int* const child_pid_ptr) {
+int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const child_pid_ptr) {
 	pid_t pid;
 
 	pid = fork();
