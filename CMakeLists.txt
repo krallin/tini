@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.8.0)
-project (tini)
+project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
