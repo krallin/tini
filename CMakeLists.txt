@@ -27,3 +27,6 @@ configure_file (
 include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini src/tini.c)
+
+# Installation
+install (TARGETS tini DESTINATION bin)
