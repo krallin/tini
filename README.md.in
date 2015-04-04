@@ -13,6 +13,10 @@ signal forwarding.
 Using Tini
 ----------
 
+*NOTE: There are [pre-built Docker images available for Tini][10]. If
+you're currently using an Ubuntu or CentOS image as your base, you can use
+one of those as a drop-in replacement.*
+
 Add Tini to your container, and make it executable. Then, just invoke Tini
 and pass your program and its arguments as arguments to Tini.
 
@@ -37,7 +41,7 @@ Arguments Tini itself are passed like so: `/tini -v -- /your/program`.
 The only supported argument at this time is `-v`, for extra verbosity (you can
 pass it up to 4 times, e.g. `-vvvv`).
 
-*NOTE*: The binary linked above is a 64-bit dynamically-linked binary.
+*NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
 
 
 ### Existing Entrypoint ###
@@ -84,3 +88,6 @@ verbosity level (up to 4):
     tini -vv   -- true
     tini -vvv  -- pwd
     tini -vvvv -- ls
+
+
+  [10]: https://github.com/krallin/tini-images
