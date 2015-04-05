@@ -17,11 +17,13 @@ set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions 
 configure_file (
 	"${PROJECT_SOURCE_DIR}/src/tiniConfig.h.in"
 	"${PROJECT_BINARY_DIR}/tiniConfig.h"
+	@ONLY
 )
 
 configure_file (
 	"${PROJECT_SOURCE_DIR}/README.md.in"
 	"${PROJECT_SOURCE_DIR}/README.md"
+	@ONLY
 )
 
 include_directories ("${PROJECT_BINARY_DIR}")

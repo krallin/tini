@@ -25,7 +25,7 @@ to manually invoke Tini:
 
     # Add Tini
     ENV TINI_VERSION v0.3.4
-    ADD https://github.com/krallin/tini/releases/download//tini /tini
+    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
 
