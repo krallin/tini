@@ -1,0 +1,21 @@
+#!/bin/bash
+# Wrapper for rpm build that first removes files that should be in there
+# We need this for compatibility with CMake <= 2.8.10 (which is the only version we have in Travis)
+# See: http://www.cmake.org/pipermail/cmake-commits/2013-April/014818.html
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Remove PATH hack so we can find the real rpmbuild
+export PATH="${REAL_PATH}"
+
+echo "Using local rpmbuild"
+
+specFile="${!#}"  # Last argument
+
+for removeLine in '"/usr"' '"/usr/bin"'; do
+  sed -i "s|${removeLine}||g" "${specFile}"
+done
+
+# Passthrough to rpmbuild
+exec rpmbuild "${@}"

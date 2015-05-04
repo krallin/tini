@@ -61,36 +61,50 @@ if __name__ == "__main__":
 
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
+    base_cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "--volume={0}:/tini".format(root),
+        "--name={0}".format(name),
+    ]
+
+    fail_cmd = ["docker", "kill", name]
+
+
+    # Funtional tests
     for entrypoint in ["/tini/dist/tini"]:
-        base_cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--volume={0}:/tini".format(root),
-            "--name={0}".format(name),
+        functional_base_cmd = base_cmd + [
             "--entrypoint={0}".format(entrypoint),
             img,
             "-vvvv",
         ]
 
-        fail_cmd = ["docker", "kill", name]
-
         # Reaping test
-        Command(base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
+        Command(functional_base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
 
         # Signals test
         for sig, retcode in [("INT", 1), ("TERM", 143)]:
             Command(
-                base_cmd + ["--", "/tini/test/signals/test.py"],
+                functional_base_cmd + ["--", "/tini/test/signals/test.py"],
                 fail_cmd,
                 ["docker", "kill", "-s", sig, name],
                 2
             ).run(timeout=10, retcode=retcode)
 
         # Exit code test
-        Command(base_cmd + ["-z"], fail_cmd).run(retcode=1)
-        Command(base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
-        Command(base_cmd + ["-h"], fail_cmd).run(retcode=0)
+        Command(functional_base_cmd + ["-z"], fail_cmd).run(retcode=1)
+        Command(functional_base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
+        Command(functional_base_cmd + ["-h"], fail_cmd).run()
 
         # Valgrind test
-        Command(base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", entrypoint, "-v", "--", "ls"], fail_cmd).run()
+        Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", entrypoint, "-v", "--", "ls"], fail_cmd).run()
+
+    # Install tests (sh -c is used for globbing and &&)
+    for image, pkg_manager, extension in [
+            ["ubuntu:precise", "dpkg", "deb"],
+            ["ubuntu:trusty", "dpkg", "deb"],
+            ["centos:6", "rpm", "rpm"],
+            ["centos:7", "rpm", "rpm"],
+    ]:
+        Command(base_cmd + [image, "sh", "-c", "{0} -i /tini/dist/*.{1} && /usr/bin/tini true".format(pkg_manager, extension)], fail_cmd).run()

@@ -8,6 +8,9 @@ HERE=$(cd "${REL_HERE}"; pwd)
 IMG="tini"
 SRC="/tini"
 
+# Cleanup the build dir
+rm -f "${HERE}/dist"/*
+
 # Create the build image
 docker build -t "${IMG}" .
 

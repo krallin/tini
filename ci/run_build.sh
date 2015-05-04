@@ -7,6 +7,11 @@ set -o nounset
 : ${DIST_DIR:="${SOURCE_DIR}/dist"}
 : ${BUILD_DIR:="/tmp/build"}
 
+# Set path to prioritize our utils
+export REAL_PATH="${PATH}"
+export PATH="${SOURCE_DIR}/ci/util:${PATH}"
+echo "PATH IS: $PATH"
+
 # Build
 cmake -B"${BUILD_DIR}" -H"${SOURCE_DIR}"
 
