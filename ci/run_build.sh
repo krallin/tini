@@ -14,6 +14,11 @@ export DIST_DIR="$(readlink -f "${DIST_DIR}")"
 export BUILD_DIR="$(readlink -f "${BUILD_DIR}")"
 
 
+# Our build platform doesn't have those newer Linux flags, but we want Tini to have subreaper support
+# We also use those in our tests
+export CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
+
+
 # Ensure Python output is not buffered (to make tests output clearer)
 export PYTHONUNBUFFERED=1
 
@@ -65,20 +70,7 @@ virtualenv "${VENV}"
 export PATH="${VENV}/bin:${PATH}"
 
 # Install test dependencies
-
-# We need a patched version because Travis only gives us Ubuntu Precise
-# (whose Linux headers don't include PR_SET_CHILD_SUBREAPER), but actually
-# runs a newer Linux Kernel (because we're actually in Docker) that has the
-# PR_SET_CHILD_SUBREAPER prctl call.
-pushd /tmp
-pip install python-prctl==1.6.1 --download="."
-tar -xvf /tmp/python-prctl-1.6.1.tar.gz
-cd python-prctl-1.6.1
-patch -p1 < "${SOURCE_DIR}/test/0001-Add-PR_SET_CHILD_SUBREAPER.patch"
-python setup.py install
-popd
-
-pip install psutil
+pip install psutil python-prctl
 
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"
