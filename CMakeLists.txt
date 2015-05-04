@@ -21,8 +21,14 @@ configure_file (
 )
 
 configure_file (
-	"${PROJECT_SOURCE_DIR}/README.md.in"
+	"${PROJECT_SOURCE_DIR}/tpl/README.md.in"
 	"${PROJECT_SOURCE_DIR}/README.md"
+	@ONLY
+)
+
+configure_file (
+	"${PROJECT_SOURCE_DIR}/tpl/travis.yml.tpl"
+	"${PROJECT_SOURCE_DIR}/.travis.yml"
 	@ONLY
 )
 
@@ -32,3 +38,27 @@ add_executable (tini src/tini.c)
 
 # Installation
 install (TARGETS tini DESTINATION bin)
+
+# Packaging
+include (InstallRequiredSystemLibraries)
+set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "A tiny but valid init process for containers")
+set (CPACK_PACKAGE_VENDOR "Thomas Orozco")
+set (CPACK_PACKAGE_CONTACT "thomas@orozco.fr")
+set (CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set (CPACK_PACKAGE_VERSION_MAJOR "${tini_VERSION_MAJOR}")
+set (CPACK_PACKAGE_VERSION_MINOR "${tini_VERSION_MINOR}")
+set (CPACK_PACKAGE_VERSION_PATCH "${tini_VERSION_PATCH}")
+set (CPACK_PACKAGE_EXECUTABLES "tini")
+set (CPACK_PACKAGE_NAME "tini")
+set (CPACK_PACKAGE_FILE_NAME "tini_${tini_VERSION_MAJOR}.${tini_VERSION_MINOR}.${tini_VERSION_PATCH}")
+set (CPACK_PACKAGE_VERSION "${tini_VERSION_MAJOR}.${tini_VERSION_MINOR}.${tini_VERSION_PATCH}")
+
+set (CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")  # TODO
+set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.3.4)")
+
+set (CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+
+set (CPACK_GENERATOR "DEB" "RPM")
+
+include (CPack)
