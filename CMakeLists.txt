@@ -4,7 +4,7 @@ project (tini C)
 # Config
 set (tini_VERSION_MAJOR 0)
 set (tini_VERSION_MINOR 3)
-set (tini_VERSION_PATCH 4)
+set (tini_VERSION_PATCH 5)
 execute_process (COMMAND git log -n 1 --date=local --pretty=format:"%h" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" OUTPUT_VARIABLE tini_VERSION_GIT)
 
 # Flags
