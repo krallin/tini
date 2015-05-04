@@ -13,6 +13,7 @@ cmake -B"${BUILD_DIR}" -H"${SOURCE_DIR}"
 pushd "${BUILD_DIR}"
 make clean
 make
+make package
 
 popd
 
@@ -28,4 +29,4 @@ fi
 
 # Place files
 mkdir -p "${DIST_DIR}"
-cp "${BUILD_DIR}"/tini "${DIST_DIR}"
+cp "${BUILD_DIR}"/tini{,*.rpm,*deb} "${DIST_DIR}"
