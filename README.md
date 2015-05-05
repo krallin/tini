@@ -34,7 +34,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.4.2
+    ENV TINI_VERSION v0.4.3
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
