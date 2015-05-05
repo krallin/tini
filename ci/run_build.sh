@@ -9,7 +9,7 @@ set -o nounset
 
 # Set path to prioritize our utils
 export REAL_PATH="${PATH}"
-export PATH="${SOURCE_DIR}/ci/util:${PATH}"
+export PATH="$(readlink -f "${SOURCE_DIR}")/ci/util:${PATH}"
 echo "PATH IS: $PATH"
 
 # Build
