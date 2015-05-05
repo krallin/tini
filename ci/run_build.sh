@@ -36,7 +36,12 @@ mkdir -p "${DIST_DIR}"
 cp "${BUILD_DIR}"/tini{,*.rpm,*deb} "${DIST_DIR}"
 
 # Quick audit
-echo "Contents for RPM:"
-rpm -qlp "${DIST_DIR}/tini"*.rpm
-echo "Contents for DEB:"
-dpkg --contents "${DIST_DIR}/tini"*deb
+if which rpm; then
+  echo "Contents for RPM:"
+  rpm -qlp "${DIST_DIR}/tini"*.rpm
+fi
+
+if which dpkg; then
+  echo "Contents for DEB:"
+  dpkg --contents "${DIST_DIR}/tini"*deb
+fi
