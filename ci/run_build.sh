@@ -10,7 +10,6 @@ set -o nounset
 # Set path to prioritize our utils
 export REAL_PATH="${PATH}"
 export PATH="$(readlink -f "${SOURCE_DIR}")/ci/util:${PATH}"
-echo "PATH IS: $PATH"
 
 # Build
 cmake -B"${BUILD_DIR}" -H"${SOURCE_DIR}"
@@ -35,3 +34,9 @@ fi
 # Place files
 mkdir -p "${DIST_DIR}"
 cp "${BUILD_DIR}"/tini{,*.rpm,*deb} "${DIST_DIR}"
+
+# Quick audit
+echo "Contents for RPM:"
+rpm -qlp "${DIST_DIR}/tini"*.rpm
+echo "Contents for DEB:"
+dpkg --contents "${DIST_DIR}/tini"*deb
