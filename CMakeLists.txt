@@ -36,8 +36,12 @@ include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini src/tini.c)
 
+add_executable (tini-static src/tini.c)
+set_target_properties (tini-static PROPERTIES LINK_FLAGS "-Wl,--no-export-dynamic -static")
+
 # Installation
 install (TARGETS tini DESTINATION bin)
+install (TARGETS tini-static DESTINATION bin)
 
 # Packaging
 include (InstallRequiredSystemLibraries)

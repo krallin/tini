@@ -22,26 +22,27 @@ make package
 popd
 
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
-tini="${BUILD_DIR}/tini"
-echo "Testing $tini with: true"
-$tini -vvvv true
+for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
+  echo "Testing $tini with: true"
+  $tini -vvvv true
 
-echo "Testing $tini with: false"
-if $tini -vvvv false; then
-  exit 1
-fi
+  echo "Testing $tini with: false"
+  if $tini -vvvv false; then
+    exit 1
+  fi
 
-# Place files
-mkdir -p "${DIST_DIR}"
-cp "${BUILD_DIR}"/tini{,*.rpm,*deb} "${DIST_DIR}"
+  # Move files to the dist dir for testing
+  mkdir -p "${DIST_DIR}"
+  cp "${BUILD_DIR}"/tini{,-static,*.rpm,*deb} "${DIST_DIR}"
 
-# Quick audit
-if which rpm; then
-  echo "Contents for RPM:"
-  rpm -qlp "${DIST_DIR}/tini"*.rpm
-fi
+  # Quick audit
+  if which rpm; then
+    echo "Contents for RPM:"
+    rpm -qlp "${DIST_DIR}/tini"*.rpm
+  fi
 
-if which dpkg; then
-  echo "Contents for DEB:"
-  dpkg --contents "${DIST_DIR}/tini"*deb
-fi
+  if which dpkg; then
+    echo "Contents for DEB:"
+    dpkg --contents "${DIST_DIR}/tini"*deb
+  fi
+done
