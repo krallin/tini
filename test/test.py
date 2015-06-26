@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
 
     # Funtional tests
-    for entrypoint in ["/tini/dist/tini"]:
+    for entrypoint in ["/tini/dist/tini", "/tini/dist/tini-static"]:
         functional_base_cmd = base_cmd + [
             "--entrypoint={0}".format(entrypoint),
             img,

@@ -63,10 +63,21 @@ Assuming your entrypoint was `/docker-entrypoint.sh`, then you would use:
     ENTRYPOINT ["/tini", "--", "/docker-entrypoint.sh"]
 
 
+### Statically-Linked Version ###
+
+Tini has very few dependencies (it only depends on libc), but if your
+container fails to start, you might want to consider using the statically-built
+version instead:
+
+    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
+
+
 ### Size Considerations ###
 
 Tini is a very small file (in the 10KB range), so it doesn't add much weight
 to your container.
+
+The statically-linked version is bigger, but still < 1M.
 
 
 ### Building Tini ###
