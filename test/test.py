@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
 
     # Funtional tests
-    for entrypoint in ["/tini/dist/tini"]:
+    for entrypoint in ["/tini/dist/tini", "/tini/dist/tini-static"]:
         functional_base_cmd = base_cmd + [
             "--entrypoint={0}".format(entrypoint),
             img,
@@ -97,10 +97,11 @@ if __name__ == "__main__":
         Command(functional_base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
         Command(functional_base_cmd + ["-h"], fail_cmd).run()
 
-        # Valgrind test
-        Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", entrypoint, "-v", "--", "ls"], fail_cmd).run()
+    # Valgrind test (we only run this on the dynamic version, because otherwise Valgrind may bring up plenty of errors that are
+    # actually from libc)
+    Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/dist/tini", "-v", "--", "ls"], fail_cmd).run()
 
-    # Install tests (sh -c is used for globbing and &&)
+    # Installation tests (sh -c is used for globbing and &&)
     for image, pkg_manager, extension in [
             ["ubuntu:precise", "dpkg", "deb"],
             ["ubuntu:trusty", "dpkg", "deb"],

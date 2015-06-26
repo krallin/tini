@@ -3,8 +3,8 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 4)
-set (tini_VERSION_PATCH 3)
+set (tini_VERSION_MINOR 5)
+set (tini_VERSION_PATCH 0)
 execute_process (COMMAND git log -n 1 --date=local --pretty=format:"%h" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" OUTPUT_VARIABLE tini_VERSION_GIT)
 
 # Flags
@@ -36,8 +36,12 @@ include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini src/tini.c)
 
+add_executable (tini-static src/tini.c)
+set_target_properties (tini-static PROPERTIES LINK_FLAGS "-Wl,--no-export-dynamic -static")
+
 # Installation
 install (TARGETS tini DESTINATION bin)
+install (TARGETS tini-static DESTINATION bin)
 
 # Packaging
 include (InstallRequiredSystemLibraries)
