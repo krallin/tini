@@ -6,4 +6,4 @@ IMG="tini"
 
 
 docker build -t "${IMG}" .
-python test/test.py  "${IMG}"
+python test/run_outer_tests.py  "${IMG}"

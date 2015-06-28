@@ -1,0 +1,35 @@
+From b8c6ccd4575837e3901bbdee7b219ef951dc2065 Mon Sep 17 00:00:00 2001
+From: Thomas Orozco <thomas@orozco.fr>
+Date: Sun, 28 Jun 2015 15:25:37 +0200
+Subject: [PATCH] Add PR_SET_CHILD_SUBREAPER
+
+---
+ _prctlmodule.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/_prctlmodule.c b/_prctlmodule.c
+index 14121c3..19ad141 100644
+--- a/_prctlmodule.c
++++ b/_prctlmodule.c
+@@ -15,6 +15,18 @@
+ #include <sys/prctl.h>
+ #include <sys/signal.h>
+ 
++/* Our builds run in a Docker environment that has those, but they are
++ * not in the kernel headers. Add them.
++ */
++
++#ifndef PR_SET_CHILD_SUBREAPER
++#define PR_SET_CHILD_SUBREAPER 36
++#endif
++
++#ifndef PR_GET_CHILD_SUBREAPER
++#define PR_GET_CHILD_SUBREAPER 37
++#endif
++
+ /* New in 2.6.32, but named and implemented inconsistently. The linux
+  * implementation has two ways of setting the policy to the default, and thus
+  * needs an extra argument. We ignore the first argument and always call
+-- 
+2.4.3
+
