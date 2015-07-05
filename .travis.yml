@@ -18,6 +18,10 @@ addons:
     - git
     - gdb
     - valgrind
+    - python-dev
+    - libcap-dev
+    - python-pip
+    - python-virtualenv
 
 script: ./ci/run_build.sh
 
