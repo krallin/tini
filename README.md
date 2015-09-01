@@ -47,12 +47,42 @@ Note that you *can* skip the `--` under certain conditions, but you might
 as well always include it to be safe. If you see an error message that
 looks like `tini: invalid option -- 'c'`, then you *need* to add the `--`.
 
-Arguments Tini itself are passed like so: `/tini -v -- /your/program`.
-The only supported argument at this time is `-v`, for extra verbosity (you can
-pass it up to 3 times, e.g. `-vvv`).
+Arguments for Tini itself should be passed like `-v` in the following example:
+`/tini -v -- /your/program`.
 
 *NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
 
+
+Options
+-------
+
+### Verbosity ###
+
+The `-v` argument can be used for extra verbose output (you can pass it up to
+3 times, e.g. `-vvv`).
+
+
+### Subreaping ###
+
+By default, Tini needs to run as PID 1 so that it can reap zombies (by
+running as PID 1, zombies get re-parented to Tini).
+
+If for some reason, you cannot run Tini as PID 1, you should register Tini as
+a process subreaper instead (only in Linux >= 3.4), by either:
+
+  + Passing the `-s` argument to Tini (`tini -s -- ...`)
+  + Setting the environment variable `TINI_SUBREAPER`
+    (e.g. `export TINI_SUBREAPER=`).
+
+This will ensure that zombies get re-parented to Tini despite Tini not running
+as PID 1.
+
+*NOTE: Tini will issue a warning if it detects that it isn't running as PID 1
+and isn't registered as a subreaper. If you don't see a warning, you're fine.*
+
+
+More
+----
 
 ### Existing Entrypoint ###
 
@@ -80,7 +110,9 @@ to your container.
 The statically-linked version is bigger, but still < 1M.
 
 
-### Building Tini ###
+Building Tini
+-------------
+
 
 If you'd rather not download the binary, you can build Tini by just running
 `make` (i.e. there is no `./configure` script).
