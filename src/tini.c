@@ -28,6 +28,7 @@
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
 #define OPT_STRING "hsv"
+#define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
 #define OPT_STRING "hv"
@@ -128,6 +129,15 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	return 0;
 }
 
+int parse_env() {
+#if HAS_SUBREAPER
+	if (getenv(SUBREAPER_ENV_VAR) != NULL) {
+		subreaper++;
+	}
+#endif
+	return 0;
+}
+
 
 #if HAS_SUBREAPER
 int register_subreaper () {
@@ -168,7 +178,8 @@ void reaper_check () {
 
 	PRINT_WARNING("Tini is not running as PID 1 and isn't registered as a child subreaper.\n\
         Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
-        Use -s or run Tini as PID 1 to fix the problem.");
+        To fix the problem, use -s or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper,\n\
+        or run Tini as PID 1.");
 }
 
 
@@ -303,6 +314,11 @@ int main(int argc, char *argv[]) {
 	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_exitcode);
 	if (parse_args_ret) {
 		return parse_exitcode;
+	}
+
+	/* Parse environment */
+	if (parse_env()) {
+		return 1;
 	}
 
 	/* Prepare sigmask */
