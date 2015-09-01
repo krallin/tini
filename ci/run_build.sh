@@ -62,9 +62,10 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   fi
 done
 
-# Create virtual environment to run tests
+# Create virtual environment to run tests.
+# Accept system site packages for faster local builds.
 VENV="${BUILD_DIR}/venv"
-virtualenv "${VENV}"
+virtualenv --system-site-packages "${VENV}"
 
 # Don't use activate because it does not play nice with nounset
 export PATH="${VENV}/bin:${PATH}"
