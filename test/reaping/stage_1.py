@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import os
+import sys
 import subprocess
 import time
 
@@ -28,6 +29,14 @@ def main():
         if set(pids) == set(expected_pids):
             break
         time.sleep(1)
+
+    # Now, check if there are any zombies
+    for process in psutil.process_iter():
+        if process.name() == "sleep":
+            print("At least one 'sleep' process was still alive or not reaped! (pid{0})".format(process.pid))
+            sys.exit(1)
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
