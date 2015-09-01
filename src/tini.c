@@ -37,7 +37,7 @@
 #if HAS_SUBREAPER
 static int subreaper = 0;
 #endif
-static int verbosity = 0;
+static int verbosity = 1;
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
 
@@ -74,7 +74,7 @@ void print_usage(char* const name, FILE* const file) {
 #if HAS_SUBREAPER
 	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
 #endif
-	fprintf(file, "  -v: Generate more verbose output. Repeat up to 4 times.\n");
+	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "\n");
 }
 

@@ -77,7 +77,7 @@ if __name__ == "__main__":
         functional_base_cmd = base_cmd + [
             "--entrypoint={0}".format(entrypoint),
             img,
-            "-vvvv",
+            "-vvv",
         ]
 
         # Reaping test

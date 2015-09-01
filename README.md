@@ -49,7 +49,7 @@ looks like `tini: invalid option -- 'c'`, then you *need* to add the `--`.
 
 Arguments Tini itself are passed like so: `/tini -v -- /your/program`.
 The only supported argument at this time is `-v`, for extra verbosity (you can
-pass it up to 4 times, e.g. `-vvvv`).
+pass it up to 3 times, e.g. `-vvv`).
 
 *NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
 
@@ -103,12 +103,11 @@ Debugging
 ---------
 
 If something isn't working just like you expect, consider increasing the
-verbosity level (up to 4):
+verbosity level (up to 3):
 
     tini -v    -- bash -c 'exit 1'
     tini -vv   -- true
     tini -vvv  -- pwd
-    tini -vvvv -- ls
 
 
   [10]: https://github.com/krallin/tini-images
