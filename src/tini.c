@@ -39,7 +39,20 @@
 static int subreaper = 0;
 #endif
 static int verbosity = 1;
+
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
+
+static const char reaper_warning[] = "Tini is not running as PID 1 "
+#if HAS_SUBREAPER
+       "and isn't registered as a child subreaper"
+#endif
+       ".\n\
+        Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
+        To fix the problem, "
+#if HAS_SUBREAPER
+        "use -s or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
+#endif
+        "run Tini as PID 1.";
 
 
 int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const child_pid_ptr) {
@@ -176,10 +189,7 @@ void reaper_check () {
 	}
 #endif
 
-	PRINT_WARNING("Tini is not running as PID 1 and isn't registered as a child subreaper.\n\
-        Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
-        To fix the problem, use -s or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper,\n\
-        or run Tini as PID 1.");
+	PRINT_WARNING(reaper_warning);
 }
 
 
