@@ -13,6 +13,18 @@ export SOURCE_DIR="$(readlink -f "${SOURCE_DIR}")"
 export DIST_DIR="$(readlink -f "${DIST_DIR}")"
 export BUILD_DIR="$(readlink -f "${BUILD_DIR}")"
 
+# Configuration
+: ${FORCE_SUBREAPER:="1"}
+export FORCE_SUBREAPER
+
+
+# Our build platform doesn't have those newer Linux flags, but we want Tini to have subreaper support
+# We also use those in our tests
+CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
+if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
+  # If FORCE_SUBREAPER is requested, then we set those CFLAGS for the Tini build
+  export CFLAGS
+fi
 
 # Ensure Python output is not buffered (to make tests output clearer)
 export PYTHONUNBUFFERED=1
@@ -34,10 +46,10 @@ popd
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
 for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   echo "Testing $tini with: true"
-  $tini -vvvv true
+  $tini -vvv true
 
   echo "Testing $tini with: false"
-  if $tini -vvvv false; then
+  if $tini -vvv false; then
     exit 1
   fi
 
@@ -57,28 +69,17 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   fi
 done
 
-# Create virtual environment to run tests
+# Create virtual environment to run tests.
+# Accept system site packages for faster local builds.
 VENV="${BUILD_DIR}/venv"
-virtualenv "${VENV}"
+virtualenv --system-site-packages "${VENV}"
 
 # Don't use activate because it does not play nice with nounset
 export PATH="${VENV}/bin:${PATH}"
+export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
 
 # Install test dependencies
-
-# We need a patched version because Travis only gives us Ubuntu Precise
-# (whose Linux headers don't include PR_SET_CHILD_SUBREAPER), but actually
-# runs a newer Linux Kernel (because we're actually in Docker) that has the
-# PR_SET_CHILD_SUBREAPER prctl call.
-pushd /tmp
-pip install python-prctl==1.6.1 --download="."
-tar -xvf /tmp/python-prctl-1.6.1.tar.gz
-cd python-prctl-1.6.1
-patch -p1 < "${SOURCE_DIR}/test/0001-Add-PR_SET_CHILD_SUBREAPER.patch"
-python setup.py install
-popd
-
-pip install psutil
+pip install psutil python-prctl
 
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"

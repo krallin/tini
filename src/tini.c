@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -24,8 +25,34 @@
 #define ARRAY_LEN(x)  (sizeof(x) / sizeof(x[0]))
 
 
-static int verbosity = 0;
+#ifdef PR_SET_CHILD_SUBREAPER
+#define HAS_SUBREAPER 1
+#define OPT_STRING "hsv"
+#define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
+#else
+#define HAS_SUBREAPER 0
+#define OPT_STRING "hv"
+#endif
+
+
+#if HAS_SUBREAPER
+static int subreaper = 0;
+#endif
+static int verbosity = 1;
+
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
+
+static const char reaper_warning[] = "Tini is not running as PID 1 "
+#if HAS_SUBREAPER
+       "and isn't registered as a child subreaper"
+#endif
+       ".\n\
+        Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
+        To fix the problem, "
+#if HAS_SUBREAPER
+        "use -s or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
+#endif
+        "run Tini as PID 1.";
 
 
 int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const child_pid_ptr) {
@@ -58,7 +85,10 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
 	fprintf(file, "  -h: Show this help message and exit.\n");
-	fprintf(file, "  -v: Generate more verbose output. Repeat up to 4 times.\n");
+#if HAS_SUBREAPER
+	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
+#endif
+	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "\n");
 }
 
@@ -67,13 +97,18 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	char* name = argv[0];
 
 	int c;
-	while ((c = getopt (argc, argv, "hv")) != -1) {
+	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
 			case 'h':
 				/* TODO - Shouldn't cause exit with -1 ..*/
 				print_usage(name, stdout);
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
+#if HAS_SUBREAPER
+			case 's':
+				subreaper++;
+				break;
+#endif
 			case 'v':
 				verbosity++;
 				break;
@@ -106,6 +141,57 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 	return 0;
 }
+
+int parse_env() {
+#if HAS_SUBREAPER
+	if (getenv(SUBREAPER_ENV_VAR) != NULL) {
+		subreaper++;
+	}
+#endif
+	return 0;
+}
+
+
+#if HAS_SUBREAPER
+int register_subreaper () {
+	if (subreaper > 0) {
+		if (prctl(PR_SET_CHILD_SUBREAPER)) {
+			if (errno == EINVAL) {
+				PRINT_FATAL("PR_SET_CHILD_SUBREAPER is unavailable on this platform. Are you using Linux >= 3.4?")
+			} else {
+				PRINT_FATAL("Failed to register as child subreaper: %s", strerror(errno))
+			}
+			return 1;
+		} else {
+			PRINT_TRACE("Registered as child subreaper");
+		}
+	}
+	return 0;
+}
+#endif
+
+
+void reaper_check () {
+	/* Check that we can properly reap zombies */
+#if HAS_SUBREAPER
+	int bit = 0;
+#endif
+
+	if (getpid() == 1) {
+		return;
+	}
+
+#if HAS_SUBREAPER
+	if (prctl(PR_GET_CHILD_SUBREAPER, &bit)) {
+		PRINT_DEBUG("Failed to read child subreaper attribute: %s", strerror(errno));
+	} else if (bit == 1) {
+		return;
+	}
+#endif
+
+	PRINT_WARNING(reaper_warning);
+}
+
 
 int prepare_sigmask(sigset_t* const parent_sigset_ptr, sigset_t* const child_sigset_ptr) {
 	/* Prepare signals to block; make sure we don't block program error signals. */
@@ -182,14 +268,14 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 
 			case -1:
 				if (errno == ECHILD) {
-					PRINT_TRACE("No child to wait.");
+					PRINT_TRACE("No child to wait");
 					break;
 				}
 				PRINT_FATAL("Error while waiting for pids: '%s'", strerror(errno));
 				return 1;
 
 			case 0:
-				PRINT_TRACE("No child to reap.");
+				PRINT_TRACE("No child to reap");
 				break;
 
 			default:
@@ -209,7 +295,7 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 						PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(WTERMSIG(current_status)));
 						*child_exitcode_ptr = 128 + WTERMSIG(current_status);
 					} else {
-						PRINT_FATAL("Main child exited for unknown reason!");
+						PRINT_FATAL("Main child exited for unknown reason");
 						return 1;
 					}
 				}
@@ -233,13 +319,6 @@ int main(int argc, char *argv[]) {
 	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
 	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
 
-	/* Prepare sigmask */
-	sigset_t parent_sigset;
-	sigset_t child_sigset;
-	if (prepare_sigmask(&parent_sigset, &child_sigset)) {
-		return 1;
-	}
-
 	/* Parse command line arguments */
 	char* (*child_args_ptr)[];
 	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_exitcode);
@@ -247,6 +326,29 @@ int main(int argc, char *argv[]) {
 		return parse_exitcode;
 	}
 
+	/* Parse environment */
+	if (parse_env()) {
+		return 1;
+	}
+
+	/* Prepare sigmask */
+	sigset_t parent_sigset;
+	sigset_t child_sigset;
+	if (prepare_sigmask(&parent_sigset, &child_sigset)) {
+		return 1;
+	}
+
+#if HAS_SUBREAPER
+	/* If available and requested, register as a subreaper */
+	if (register_subreaper()) {
+		return 1;
+	};
+#endif
+
+	/* Are we going to reap zombies properly? If not, warn. */
+	reaper_check();
+
+	/* Go on */
 	if (spawn(&child_sigset, *child_args_ptr, &child_pid)) {
 		return 1;
 	}
@@ -264,7 +366,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (child_exitcode != -1) {
-			PRINT_TRACE("Child has exited. Exiting");
+			PRINT_TRACE("Exiting: child has exited");
 			return child_exitcode;
 		}
 	}
