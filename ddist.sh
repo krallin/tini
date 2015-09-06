@@ -14,5 +14,10 @@ rm -f "${HERE}/dist"/*
 # Create the build image
 docker build -t "${IMG}" .
 
-# Run the build
-docker run --rm --volume="${HERE}:${SRC}" -e BUILD_DIR=/tmp/tini-build -e SOURCE_DIR="${SRC}" "${IMG}" "${SRC}/ci/run_build.sh"
+# Run test without subreaper support, don't copy build files here
+docker run --rm \
+  --volume="${HERE}:${SRC}" \
+  -e BUILD_DIR=/tmp/tini-build \
+  -e SOURCE_DIR="${SRC}" \
+  -e FORCE_SUBREAPER="${FORCE_SUBREAPER}" \
+  "${IMG}" "${SRC}/ci/run_build.sh"

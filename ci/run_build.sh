@@ -13,11 +13,18 @@ export SOURCE_DIR="$(readlink -f "${SOURCE_DIR}")"
 export DIST_DIR="$(readlink -f "${DIST_DIR}")"
 export BUILD_DIR="$(readlink -f "${BUILD_DIR}")"
 
+# Configuration
+: ${FORCE_SUBREAPER:="1"}
+export FORCE_SUBREAPER
+
 
 # Our build platform doesn't have those newer Linux flags, but we want Tini to have subreaper support
 # We also use those in our tests
-export CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
-
+CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
+if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
+  # If FORCE_SUBREAPER is requested, then we set those CFLAGS for the Tini build
+  export CFLAGS
+fi
 
 # Ensure Python output is not buffered (to make tests output clearer)
 export PYTHONUNBUFFERED=1
@@ -69,6 +76,7 @@ virtualenv --system-site-packages "${VENV}"
 
 # Don't use activate because it does not play nice with nounset
 export PATH="${VENV}/bin:${PATH}"
+export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
 
 # Install test dependencies
 pip install psutil python-prctl
