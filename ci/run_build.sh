@@ -45,6 +45,9 @@ popd
 
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
 for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
+  echo "Smoke test for $tini"
+  $tini -h
+
   echo "Testing $tini with: true"
   $tini -vvv true
 
