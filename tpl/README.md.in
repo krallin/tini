@@ -113,9 +113,17 @@ The statically-linked version is bigger, but still < 1M.
 Building Tini
 -------------
 
+If you'd rather not download the binary, you can build Tini by running
+`cmake . && make`.
 
-If you'd rather not download the binary, you can build Tini by just running
-`make` (i.e. there is no `./configure` script).
+Before building, you probably also want to run:
+
+    export CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
+
+This ensure that even if you're building on a system that has old Linux Kernel
+headers (< 3.4), Tini will be built with child subreaper support. This is
+usually what you want if you're going to use Tini with Docker (if your host
+Kernel supports Docker, it should also support child subreapers).
 
 
 Understanding Tini
