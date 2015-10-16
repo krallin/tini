@@ -81,7 +81,7 @@ int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const
 
 
 void print_usage(char* const name, FILE* const file) {
-	fprintf(file, "%s (version %s - %s)\n", basename(name), TINI_VERSION, TINI_GIT);
+	fprintf(file, "%s (version %s%s)\n", basename(name), TINI_VERSION, TINI_GIT);
 	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
 	fprintf(file, "  -h: Show this help message and exit.\n");

@@ -1,2 +1,2 @@
 #define TINI_VERSION "@tini_VERSION_MAJOR@.@tini_VERSION_MINOR@.@tini_VERSION_PATCH@"
-#define TINI_GIT     @tini_VERSION_GIT@
+#define TINI_GIT     "@tini_VERSION_GIT@"
