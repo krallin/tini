@@ -2,6 +2,8 @@
 set -o errexit
 set -o nounset
 
+: ${FORCE_SUBREAPER:="1"}
+
 REL_HERE=$(dirname "${BASH_SOURCE}")
 HERE=$(cd "${REL_HERE}"; pwd)
 
