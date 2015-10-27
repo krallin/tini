@@ -36,10 +36,10 @@
 
 
 #if HAS_SUBREAPER
-static int subreaper = 0;
+static unsigned int subreaper = 0;
 #endif
-static int verbosity = 1;
-static int kill_process_group = 0;
+static unsigned int verbosity = 1;
+static unsigned int kill_process_group = 0;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
