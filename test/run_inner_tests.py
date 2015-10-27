@@ -4,6 +4,20 @@ import os
 import sys
 import signal
 import subprocess
+import time
+import psutil
+
+
+def busy_wait(condition_callable, timeout):
+    checks = 100
+    increment = float(timeout) / checks
+
+    for _ in xrange(checks):
+        if condition_callable():
+            return
+        time.sleep(increment)
+
+    assert False, "Condition was never met"
 
 
 def main():
@@ -47,7 +61,17 @@ def main():
             sig = getattr(signal, signame)
             p.send_signal(sig)
             ret = p.wait()
-            assert ret == - sig, "Signals test failed!"
+            assert ret == -sig, "Signals test failed!"
+
+    # Run the process group test
+    # This test has Tini spawn a process that ignores SIGUSR1 and spawns a child that doesn't (and waits on the child)
+    # We send SIGUSR1 to Tini, and expect the grand-child to terminate, then the child, and then Tini.
+    print "Running process group test"
+    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], env=dict(os.environ, **env))
+
+    busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
+    p.send_signal(signal.SIGUSR1)
+    busy_wait(lambda: p.poll() is not None, 10)
 
     # Run failing test
     print "Running failing test"

@@ -27,11 +27,11 @@
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hsv"
+#define OPT_STRING "hsvg"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hv"
+#define OPT_STRING "hvg"
 #endif
 
 
@@ -39,6 +39,7 @@
 static int subreaper = 0;
 #endif
 static int verbosity = 1;
+static int kill_process_group = 0;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
@@ -68,6 +69,13 @@ int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const
 			PRINT_FATAL("Setting child signal mask failed: '%s'", strerror(errno));
 			return 1;
 		}
+
+		// Put the child into a new process group
+		if (setpgid(0, 0) < 0) {
+			PRINT_FATAL("setpgid failed: '%s'", strerror(errno));
+			return 1;
+		}
+
 		execvp(argv[0], argv);
 		PRINT_FATAL("Executing child process '%s' failed: '%s'", argv[0], strerror(errno));
 		return 1;
@@ -89,6 +97,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
 #endif
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
+	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "\n");
 }
 
@@ -112,6 +121,11 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 			case 'v':
 				verbosity++;
 				break;
+
+			case 'g':
+				kill_process_group++;
+				break;
+
 			case '?':
 				print_usage(name, stderr);
 				return 1;
@@ -242,7 +256,7 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 			default:
 				PRINT_DEBUG("Passing signal: '%s'", strsignal(sig.si_signo));
 				/* Forward anything else */
-				if (kill(child_pid, sig.si_signo)) {
+				if (kill(kill_process_group ? -child_pid : child_pid, sig.si_signo)) {
 					if (errno == ESRCH) {
 						PRINT_WARNING("Child was dead when forwarding signal");
 					} else {
