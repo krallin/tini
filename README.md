@@ -27,6 +27,9 @@ Using Tini
 you're currently using an Ubuntu or CentOS image as your base, you can use
 one of those as a drop-in replacement.*
 
+*NOTE: There is a Tini package for Alpine Linux. See below for installation
+instructions.*
+
 Add Tini to your container, and make it executable. Then, just invoke Tini
 and pass your program and its arguments as arguments to Tini.
 
@@ -51,6 +54,14 @@ Arguments for Tini itself should be passed like `-v` in the following example:
 `/tini -v -- /your/program`.
 
 *NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
+
+
+### Alpine Linux Package ###
+
+On Alpine Linux, you can use the following command to install Tini (currently
+available as a `testing` package):
+
+    apk add --update --repository http://dl-1.alpinelinux.org/alpine/edge/testing/ tini
 
 
 Options
