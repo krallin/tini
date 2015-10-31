@@ -56,6 +56,14 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
     exit 1
   fi
 
+  # Test stdin / stdout are handed over to child
+  echo "Testing pipe"
+  echo "exit 0" | $tini -vvv sh
+  if [[ ! "$?" -eq "0" ]]; then
+    echo "Pipe test failed"
+    exit 1
+  fi
+
   # Move files to the dist dir for testing
   mkdir -p "${DIST_DIR}"
   cp "${BUILD_DIR}"/tini{,-static,*.rpm,*deb} "${DIST_DIR}"

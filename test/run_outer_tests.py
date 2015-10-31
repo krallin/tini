@@ -5,6 +5,12 @@ import time
 import pipes
 import subprocess
 import threading
+import pexpect
+
+
+class ReturnContainer():
+    def __init__(self):
+        self.value = None
 
 
 class Command(object):
@@ -27,6 +33,8 @@ class Command(object):
             self.stdout, self.stderr = self.proc.communicate()
 
         thread = threading.Thread(target=target)
+        thread.daemon = True
+
         thread.start()
 
         if self.post_cmd is not None:
@@ -55,6 +63,44 @@ class Command(object):
             print "OK"
 
 
+def test_tty_handling(img, base_cmd, fail_cmd):
+    print "Testing TTY handling"
+    rc = ReturnContainer()
+
+    shell_ready_event = threading.Event()
+
+    def attach_and_terminate():
+        p = pexpect.spawn("docker attach {0}".format(name))
+        p.sendline('')
+        p.sendline('exit 0')
+        p.sendeof()
+
+    def spawn():
+        p = pexpect.spawn(" ".join(base_cmd + ["--tty", "--interactive", img, "/tini/dist/tini", "--", "sh"]))
+        p.expect_exact("#")
+        shell_ready_event.set()
+        rc.value = p.wait()
+
+    thread = threading.Thread(target=spawn)
+    thread.daemon = True
+
+    thread.start()
+
+    if not shell_ready_event.wait(2):
+        raise Exception("Timeout waiting for shell to spawn")
+
+    attach_and_terminate()
+
+    thread.join(timeout=2)
+
+    if thread.is_alive():
+        fail_cmd()
+        raise Exception("Timeout!")
+
+    if rc.value != 0:
+        raise Exception("Return code is: {0}".format(rc.value))
+
+
 if __name__ == "__main__":
     img = sys.argv[1]
     name = "{0}-test".format(img)
@@ -69,7 +115,7 @@ if __name__ == "__main__":
         "--name={0}".format(name),
     ]
 
-    fail_cmd = ["docker", "kill", name]
+    fail_cmd = ["docker", "kill", "-s", "KILL", name]
 
 
     # Funtional tests
@@ -109,3 +155,7 @@ if __name__ == "__main__":
             ["centos:7", "rpm", "rpm"],
     ]:
         Command(base_cmd + [image, "sh", "-c", "{0} -i /tini/dist/*.{1} && /usr/bin/tini true".format(pkg_manager, extension)], fail_cmd).run()
+
+
+    # Test tty handling
+    test_tty_handling(img, base_cmd, fail_cmd)
