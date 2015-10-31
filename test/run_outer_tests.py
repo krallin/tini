@@ -6,6 +6,7 @@ import pipes
 import subprocess
 import threading
 import pexpect
+import signal
 
 
 class ReturnContainer():
@@ -63,20 +64,26 @@ class Command(object):
             print "OK"
 
 
-def test_tty_handling(img, base_cmd, fail_cmd):
-    print "Testing TTY handling"
+def attach_and_type_exit_0(name):
+    p = pexpect.spawn("docker attach {0}".format(name))
+    p.sendline('')
+    p.sendline('exit 0')
+
+
+def attach_and_issue_ctrl_c(name):
+    p = pexpect.spawn("docker attach {0}".format(name))
+    p.expect_exact('#')
+    p.sendintr()
+
+
+def test_tty_handling(img, name, base_cmd, fail_cmd, container_command, exit_function, expect_exit_code):
+    print "Testing TTY handling (using container command '{0}' and exit function '{1}')".format(container_command, exit_function.__name__)
     rc = ReturnContainer()
 
     shell_ready_event = threading.Event()
 
-    def attach_and_terminate():
-        p = pexpect.spawn("docker attach {0}".format(name))
-        p.sendline('')
-        p.sendline('exit 0')
-        p.sendeof()
-
     def spawn():
-        p = pexpect.spawn(" ".join(base_cmd + ["--tty", "--interactive", img, "/tini/dist/tini", "--", "sh"]))
+        p = pexpect.spawn(" ".join(base_cmd + ["--tty", "--interactive", img, "/tini/dist/tini", "-vvv", "--", container_command]))
         p.expect_exact("#")
         shell_ready_event.set()
         rc.value = p.wait()
@@ -89,19 +96,20 @@ def test_tty_handling(img, base_cmd, fail_cmd):
     if not shell_ready_event.wait(2):
         raise Exception("Timeout waiting for shell to spawn")
 
-    attach_and_terminate()
+    exit_function(name)
 
     thread.join(timeout=2)
 
     if thread.is_alive():
-        fail_cmd()
-        raise Exception("Timeout!")
+        subprocess.check_call(fail_cmd)
+        raise Exception("Timeout waiting for container to exit!")
 
-    if rc.value != 0:
-        raise Exception("Return code is: {0}".format(rc.value))
+    if rc.value != expect_exit_code:
+        raise Exception("Return code is: {0} (expected {1})".format(rc.value, expect_exit_code))
 
 
-if __name__ == "__main__":
+
+def main():
     img = sys.argv[1]
     name = "{0}-test".format(img)
 
@@ -116,7 +124,6 @@ if __name__ == "__main__":
     ]
 
     fail_cmd = ["docker", "kill", "-s", "KILL", name]
-
 
     # Funtional tests
     for entrypoint in ["/tini/dist/tini", "/tini/dist/tini-static"]:
@@ -158,4 +165,9 @@ if __name__ == "__main__":
 
 
     # Test tty handling
-    test_tty_handling(img, base_cmd, fail_cmd)
+    test_tty_handling(img, name, base_cmd, fail_cmd, "dash", attach_and_type_exit_0, 0)
+    test_tty_handling(img, name, base_cmd, fail_cmd, "dash -c 'while true; do echo \#; sleep 0.1; done'", attach_and_issue_ctrl_c, 128 + signal.SIGINT)
+
+
+if __name__ == "__main__":
+    main()
