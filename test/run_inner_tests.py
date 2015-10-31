@@ -60,20 +60,19 @@ def main():
 
 
         # Run the signals test
-        for signame in "SIGINT", "SIGTERM":
-            print "running signal test for: {0} ({1} with env {2})".format(signame, " ".join(target), env)
+        for signum in [signal.SIGINT, signal.SIGTERM]:
+            print "running signal test for: {0} ({1} with env {2})".format(SIGNUM_TO_SIGNAME[signum], " ".join(target), env)
             p = subprocess.Popen(target + [os.path.join(src, "test", "signals", "test.py")], env=dict(os.environ, **env))
-            sig = getattr(signal, signame)
-            p.send_signal(sig)
+            p.send_signal(signum)
             ret = p.wait()
-            assert ret == -sig, "Signals test failed!"
+            assert ret == -signum, "Signals test failed (ret was {0}, expected {1})".format(ret, -signum)
 
 
     # Run the process group test
     # This test has Tini spawn a process that ignores SIGUSR1 and spawns a child that doesn't (and waits on the child)
     # We send SIGUSR1 to Tini, and expect the grand-child to terminate, then the child, and then Tini.
     print "Running process group test"
-    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], env=dict(os.environ, **env))
+    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
     p.send_signal(signal.SIGUSR1)
