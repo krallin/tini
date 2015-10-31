@@ -3,10 +3,14 @@
 set -o errexit
 set -o nounset
 
+# Default compiler
+: ${CC:="gcc"}
+
 # Paths
 : ${SOURCE_DIR:="."}
 : ${DIST_DIR:="${SOURCE_DIR}/dist"}
 : ${BUILD_DIR:="/tmp/build"}
+
 
 # Make those paths absolute, and export them for the Python tests to consume.
 export SOURCE_DIR="$(readlink -f "${SOURCE_DIR}")"
@@ -80,6 +84,9 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   fi
 done
 
+# Compile test code
+"${CC}" -o "${BUILD_DIR}/sigconf-test" "${SOURCE_DIR}/test/sigconf/sigconf-test.c"
+
 # Create virtual environment to run tests.
 # Accept system site packages for faster local builds.
 VENV="${BUILD_DIR}/venv"
@@ -90,7 +97,7 @@ export PATH="${VENV}/bin:${PATH}"
 export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
 
 # Install test dependencies
-pip install psutil python-prctl
+pip install psutil python-prctl bitmap
 
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"

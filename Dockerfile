@@ -5,4 +5,4 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Pre-install those here for faster local builds.
-RUN CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37" pip install psutil python-prctl
+RUN CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37" pip install psutil python-prctl bitmap
