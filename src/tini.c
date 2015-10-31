@@ -16,13 +16,19 @@
 
 #include "tiniConfig.h"
 
-#define PRINT_FATAL(...)    fprintf(stderr, "[FATAL] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
-#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN ] "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
-#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, "[INFO ] "); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, "[DEBUG] "); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, "[TRACE] "); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define PRINT_FATAL(...)                         fprintf(stderr, "[FATAL tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
+#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN  tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, "[INFO  tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, "[DEBUG tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, "[TRACE tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
 
 #define ARRAY_LEN(x)  (sizeof(x) / sizeof(x[0]))
+
+typedef struct {
+   sigset_t* const sigmask_ptr;
+   struct sigaction* const sigttin_action_ptr;
+   struct sigaction* const sigttou_action_ptr;
+} signal_configuration_t;
 
 
 #ifdef PR_SET_CHILD_SUBREAPER
@@ -55,24 +61,71 @@ static const char reaper_warning[] = "Tini is not running as PID 1 "
 #endif
         "run Tini as PID 1.";
 
+int restore_signals(const signal_configuration_t* const sigconf_ptr) {
+	if (sigprocmask(SIG_SETMASK, sigconf_ptr->sigmask_ptr, NULL)) {
+		PRINT_FATAL("Restoring child signal mask failed: '%s'", strerror(errno));
+		return 1;
+	}
 
-int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const child_pid_ptr) {
+	if (sigaction(SIGTTIN, sigconf_ptr->sigttin_action_ptr, NULL)) {
+		PRINT_FATAL("Restoring SIGTTIN handler failed: '%s'", strerror((errno)));
+		return 1;
+	}
+
+	if (sigaction(SIGTTOU, sigconf_ptr->sigttou_action_ptr, NULL)) {
+		PRINT_FATAL("Restoring SIGTTOU handler failed: '%s'", strerror((errno)));
+		return 1;
+	}
+
+	return 0;
+}
+
+int isolate_child() {
+	// Put the child into a new process group.
+	if (setpgid(0, 0) < 0) {
+		PRINT_FATAL("setpgid failed: '%s'", strerror(errno));
+		return 1;
+	}
+
+	// If there is a tty, allocate it to this new process group. We
+	// can do this in the child process because we're blocking
+	// SIGTTIN / SIGTTOU.
+
+	// Doing it in the child process avoids a race condition scenario
+	// if Tini is calling Tini (in which case the grandparent may make the
+	// parent the foreground process group, and the actual child ends up...
+	// in the background!)
+	if (tcsetpgrp(STDIN_FILENO, getpgrp())) {
+		if (errno == ENOTTY) {
+			PRINT_DEBUG("tcsetpgrp failed: no tty (ok to proceed)")
+		} else {
+			PRINT_FATAL("tcsetpgrp failed: '%s'", strerror(errno));
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
 	pid_t pid;
+
+	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
 
 	pid = fork();
 	if (pid < 0) {
 		PRINT_FATAL("Fork failed: '%s'", strerror(errno));
 		return 1;
 	} else if (pid == 0) {
-		// Child
-		if (sigprocmask(SIG_SETMASK, child_sigset_ptr, NULL)) {
-			PRINT_FATAL("Setting child signal mask failed: '%s'", strerror(errno));
+
+		// Put the child in a process group and make it the foreground process if there is a tty.
+		if (isolate_child()) {
 			return 1;
 		}
 
-		// Put the child into a new process group
-		if (setpgid(0, 0) < 0) {
-			PRINT_FATAL("setpgid failed: '%s'", strerror(errno));
+		// Restore all signal handlers to the way they were before we touched them.
+		if (restore_signals(sigconf_ptr)) {
 			return 1;
 		}
 
@@ -207,24 +260,45 @@ void reaper_check () {
 }
 
 
-int prepare_sigmask(sigset_t* const parent_sigset_ptr, sigset_t* const child_sigset_ptr) {
-	/* Prepare signals to block; make sure we don't block program error signals. */
+int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configuration_t* const sigconf_ptr) {
+	/* Block all signals that are meant to be collected by the main loop */
 	if (sigfillset(parent_sigset_ptr)) {
 		PRINT_FATAL("sigfillset failed: '%s'", strerror(errno));
 		return 1;
 	}
 
+	// These ones shouldn't be collected by the main loop
 	uint i;
-	int ignore_signals[] = {SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGABRT, SIGTRAP, SIGSYS} ;
-	for (i = 0; i < ARRAY_LEN(ignore_signals); i++) {
-		if (sigdelset(parent_sigset_ptr, ignore_signals[i])) {
-			PRINT_FATAL("sigdelset failed: '%i'", ignore_signals[i]);
+	int signals_for_tini[] = {SIGFPE, SIGILL, SIGSEGV, SIGBUS, SIGABRT, SIGTRAP, SIGSYS, SIGTTIN, SIGTTOU};
+	for (i = 0; i < ARRAY_LEN(signals_for_tini); i++) {
+		if (sigdelset(parent_sigset_ptr, signals_for_tini[i])) {
+			PRINT_FATAL("sigdelset failed: '%i'", signals_for_tini[i]);
 			return 1;
 		}
 	}
 
-	if (sigprocmask(SIG_SETMASK, parent_sigset_ptr, child_sigset_ptr)) {
+	if (sigprocmask(SIG_SETMASK, parent_sigset_ptr, sigconf_ptr->sigmask_ptr)) {
 		PRINT_FATAL("sigprocmask failed: '%s'", strerror(errno));
+		return 1;
+	}
+
+	// Handle SIGTTIN and SIGTTOU separately. Since Tini makes the child process group
+	// the foreground process group, there's a chance Tini can end up not controlling the tty.
+	// If TOSTOP is set on the tty, this could block Tini on writing debug messages. We don't
+	// want that. Ignore those signals.
+	struct sigaction ign_action;
+	memset(&ign_action, 0, sizeof ign_action);
+
+	ign_action.sa_handler = SIG_IGN;
+	sigemptyset(&ign_action.sa_mask);
+
+	if (sigaction(SIGTTIN, &ign_action, sigconf_ptr->sigttin_action_ptr)) {
+		PRINT_FATAL("Failed to ignore SIGTTIN");
+		return 1;
+	}
+
+	if (sigaction(SIGTTOU, &ign_action, sigconf_ptr->sigttou_action_ptr)) {
+		PRINT_FATAL("Failed to ignore SIGTTOU");
 		return 1;
 	}
 
@@ -345,10 +419,19 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	/* Prepare sigmask */
-	sigset_t parent_sigset;
-	sigset_t child_sigset;
-	if (prepare_sigmask(&parent_sigset, &child_sigset)) {
+	/* Configure signals */
+	sigset_t parent_sigset, child_sigset;
+	struct sigaction sigttin_action, sigttou_action;
+	memset(&sigttin_action, 0, sizeof sigttin_action);
+	memset(&sigttou_action, 0, sizeof sigttou_action);
+
+	signal_configuration_t child_sigconf = {
+		.sigmask_ptr = &child_sigset,
+		.sigttin_action_ptr = &sigttin_action,
+		.sigttou_action_ptr = &sigttou_action,
+	};
+
+	if (configure_signals(&parent_sigset, &child_sigconf)) {
 		return 1;
 	}
 
@@ -363,7 +446,7 @@ int main(int argc, char *argv[]) {
 	reaper_check();
 
 	/* Go on */
-	if (spawn(&child_sigset, *child_args_ptr, &child_pid)) {
+	if (spawn(&child_sigconf, *child_args_ptr, &child_pid)) {
 		return 1;
 	}
 	free(child_args_ptr);

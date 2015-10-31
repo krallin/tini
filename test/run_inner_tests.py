@@ -6,6 +6,11 @@ import signal
 import subprocess
 import time
 import psutil
+import bitmap
+import re
+
+
+SIGNUM_TO_SIGNAME = dict((v, k) for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
 
 
 def busy_wait(condition_callable, timeout):
@@ -55,31 +60,57 @@ def main():
 
 
         # Run the signals test
-        for signame in "SIGINT", "SIGTERM":
-            print "running signal test for: {0} ({1} with env {2})".format(signame, " ".join(target), env)
+        for signum in [signal.SIGINT, signal.SIGTERM]:
+            print "running signal test for: {0} ({1} with env {2})".format(SIGNUM_TO_SIGNAME[signum], " ".join(target), env)
             p = subprocess.Popen(target + [os.path.join(src, "test", "signals", "test.py")], env=dict(os.environ, **env))
-            sig = getattr(signal, signame)
-            p.send_signal(sig)
+            p.send_signal(signum)
             ret = p.wait()
-            assert ret == -sig, "Signals test failed!"
+            assert ret == -signum, "Signals test failed (ret was {0}, expected {1})".format(ret, -signum)
+
 
     # Run the process group test
     # This test has Tini spawn a process that ignores SIGUSR1 and spawns a child that doesn't (and waits on the child)
     # We send SIGUSR1 to Tini, and expect the grand-child to terminate, then the child, and then Tini.
     print "Running process group test"
-    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], env=dict(os.environ, **env))
+    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
     p.send_signal(signal.SIGUSR1)
     busy_wait(lambda: p.poll() is not None, 10)
 
+
     # Run failing test
-    print "Running failing test"
+    print "Running zombie reaping failure test (Tini should warn)"
     p = subprocess.Popen([tini, "--", os.path.join(src, "test", "reaping", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     assert "zombie reaping won't work" in err, "No warning message was output!"
     ret = p.wait()
     assert ret == 1, "Reaping test succeeded (it should have failed)!"
+
+
+    # Test that the signals are properly in place here.
+    print "running signal configuration test"
+
+    p = subprocess.Popen([os.path.join(build, "sigconf-test"), tini, '-g', '--', "cat", "/proc/self/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+
+    # Extract the signal properties, and add a zero at the end.
+    props = [line.split(":") for line in out.splitlines()]
+    props = [(k.strip(), v.strip()) for (k, v) in props]
+    props = [(k, bitmap.BitMap.fromstring(bin(int(v, 16))[2:].zfill(32))) for (k, v) in props if k in ["SigBlk", "SigIgn", "SigCgt"]]
+    props = dict(props)
+
+    # Print actual handling configuration
+    for k, bmp in props.items():
+        print "{0}: {1}".format(k, ", ".join(["{0} ({1})".format(SIGNUM_TO_SIGNAME[n+1], n+1) for n in bmp.nonzero()]))
+
+    for signal_set_name, signals_to_test_for in [
+        ("SigIgn", [signal.SIGTTOU, signal.SIGSEGV, signal.SIGINT,]),
+        ("SigBlk", [signal.SIGTTIN, signal.SIGILL,  signal.SIGTERM,]),
+    ]:
+        for signum in signals_to_test_for:
+            # Use signum - 1 because the bitmap is 0-indexed but represents signals strting at 1
+            assert (signum - 1) in props[signal_set_name].nonzero(), "{0} ({1}) is missing in {2}!".format(SIGNUM_TO_SIGNAME[signum], signum, signal_set_name)
 
     print "---------------------------"
     print "All done, tests as expected"
