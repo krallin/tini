@@ -83,6 +83,17 @@ int spawn(const sigset_t* const child_sigset_ptr, char* const argv[], int* const
 		// Parent
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
 		*child_pid_ptr = pid;
+
+		// If there is a tty, pass control over to the child process group
+		if (tcsetpgrp(STDIN_FILENO, pid)) {
+			if (errno == ENOTTY) {
+				PRINT_DEBUG("tcsetpgrp failed: no tty (ok to proceed)")
+			} else {
+				PRINT_FATAL("tcsetpgrp failed: '%s'", strerror(errno));
+				return 1;
+			}
+		}
+
 		return 0;
 	}
 }
