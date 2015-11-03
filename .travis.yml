@@ -22,6 +22,7 @@ addons:
     - libcap-dev
     - python-pip
     - python-virtualenv
+    - hardening-includes
 
 script: ./ci/run_build.sh
 
