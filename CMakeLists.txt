@@ -4,7 +4,7 @@ project (tini C)
 # Config
 set (tini_VERSION_MAJOR 0)
 set (tini_VERSION_MINOR 8)
-set (tini_VERSION_PATCH 2)
+set (tini_VERSION_PATCH 3)
 
 # Extract git version and dirty-ness
 execute_process (
@@ -30,7 +30,22 @@ else()
 endif()
 
 # Flags
-add_definitions (-D_FORTIFY_SOURCE=2)
+include(CheckCSourceCompiles)
+
+check_c_source_compiles("
+#ifndef _FORTIFY_SOURCE
+#error \"Not defined: _FORTIFY_SOURCE\"
+#endif
+int main(void)                                                                                                              {
+  return 0;
+}
+" HAS_BUILTIN_FORTIFY)
+
+# Flags
+if(NOT HAS_BUILTIN_FORTIFY)
+	add_definitions(-D_FORTIFY_SOURCE=2)
+endif()
+
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Werror -Wextra -Wall -pedantic-errors -O2 -fstack-protector --param=ssp-buffer-size=4 -Wformat")
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-s")
 
