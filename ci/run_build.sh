@@ -50,39 +50,42 @@ popd
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
 for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   echo "Smoke test for $tini"
-  $tini -h
+  "${tini}" -h
 
   echo "Testing $tini with: true"
-  $tini -vvv true
+  "${tini}" -vvv true
 
   echo "Testing $tini with: false"
-  if $tini -vvv false; then
+  if "${tini}" -vvv false; then
     exit 1
   fi
 
   # Test stdin / stdout are handed over to child
   echo "Testing pipe"
-  echo "exit 0" | $tini -vvv sh
+  echo "exit 0" | "${tini}" -vvv sh
   if [[ ! "$?" -eq "0" ]]; then
     echo "Pipe test failed"
     exit 1
   fi
 
-  # Move files to the dist dir for testing
-  mkdir -p "${DIST_DIR}"
-  cp "${BUILD_DIR}"/tini{,-static,*.rpm,*deb} "${DIST_DIR}"
-
-  # Quick audit
-  if which rpm; then
-    echo "Contents for RPM:"
-    rpm -qlp "${DIST_DIR}/tini"*.rpm
-  fi
-
-  if which dpkg; then
-    echo "Contents for DEB:"
-    dpkg --contents "${DIST_DIR}/tini"*deb
-  fi
+  echo "Checking hardening on $tini"
+  hardening-check --nopie --nostackprotector --nobindnow "${tini}"
 done
+
+# Move files to the dist dir for testing
+mkdir -p "${DIST_DIR}"
+cp "${BUILD_DIR}"/tini{,-static,*.rpm,*deb} "${DIST_DIR}"
+
+# Quick package audit
+if which rpm; then
+  echo "Contents for RPM:"
+  rpm -qlp "${DIST_DIR}/tini"*.rpm
+fi
+
+if which dpkg; then
+  echo "Contents for DEB:"
+  dpkg --contents "${DIST_DIR}/tini"*deb
+fi
 
 # Compile test code
 "${CC}" -o "${BUILD_DIR}/sigconf-test" "${SOURCE_DIR}/test/sigconf/sigconf-test.c"
