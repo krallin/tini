@@ -8,14 +8,14 @@ set (tini_VERSION_PATCH 3)
 
 # Extract git version and dirty-ness
 execute_process (
-  COMMAND git log -n 1 --date=local --pretty=format:%h
+  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" log -n 1 --date=local --pretty=format:%h
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
   RESULT_VARIABLE git_version_check_ret
   OUTPUT_VARIABLE tini_VERSION_GIT
 )
 
 execute_process(
-  COMMAND git status --porcelain --untracked-files=no
+  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" status --porcelain --untracked-files=no
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
   OUTPUT_VARIABLE git_dirty_check_out
 )
