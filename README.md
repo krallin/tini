@@ -27,8 +27,8 @@ Using Tini
 you're currently using an Ubuntu or CentOS image as your base, you can use
 one of those as a drop-in replacement.*
 
-*NOTE: There is a Tini package for Alpine Linux. See below for installation
-instructions.*
+*NOTE: There are Tini packages for Alpine Linux and NixOS. See below for
+installation instructions.*
 
 Add Tini to your container, and make it executable. Then, just invoke Tini
 and pass your program and its arguments as arguments to Tini.
@@ -62,6 +62,13 @@ On Alpine Linux, you can use the following command to install Tini (currently
 available as a `testing` package):
 
     apk add --update --repository http://dl-1.alpinelinux.org/alpine/edge/testing/ tini
+
+
+### NixOS ###
+
+Using Nix, you can use the following command to install Tini:
+
+    nix-env --install tini
 
 
 Options
@@ -179,4 +186,27 @@ verbosity level (up to 3):
     tini -vvv  -- pwd
 
 
+Authors
+=======
+
+Maintainer:
+
+  + [Thomas Orozco][20]
+
+Contributors:
+
+  + [Tianon Gravi][21]
+  + [David Wragg][22]
+
+Special thanks to:
+
+  + [Danilo Bürger][23] for packaging Tini for Alpine
+  + [Asko Soukka][24] for packaging Tini for Nix
+
+
   [10]: https://github.com/krallin/tini-images
+  [20]: https://github.com/krallin/
+  [21]: https://github.com/tianon
+  [22]: https://github.com/dpw
+  [23]: https://github.com/danilobuerger
+  [24]: https://github.com/datakurre
