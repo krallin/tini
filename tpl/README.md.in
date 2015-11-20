@@ -186,4 +186,27 @@ verbosity level (up to 3):
     tini -vvv  -- pwd
 
 
+Authors
+=======
+
+Maintainer:
+
+  + [Thomas Orozco][20]
+
+Contributors:
+
+  + [Tianon Gravi][21]
+  + [David Wragg][22]
+
+Special thanks to:
+
+  + [Danilo Bürger][23] for packaging Tini for Alpine
+  + [Asko Soukka][24] for packaging Tini for Nix
+
+
   [10]: https://github.com/krallin/tini-images
+  [20]: https://github.com/krallin/
+  [21]: https://github.com/tianon
+  [22]: https://github.com/dpw
+  [23]: https://github.com/danilobuerger
+  [24]: https://github.com/datakurre
