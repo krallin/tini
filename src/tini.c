@@ -15,6 +15,7 @@
 #include <stdbool.h>
 
 #include "tiniConfig.h"
+#include "vendor/libcperciva/getopt.h"
 
 #define PRINT_FATAL(...)                         fprintf(stderr, "[FATAL tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN  tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
@@ -33,11 +34,9 @@ typedef struct {
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hsvg"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hvg"
 #endif
 
 
@@ -143,14 +142,14 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "%s (version %s%s)\n", basename(name), TINI_VERSION, TINI_GIT);
-	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
+	fprintf(file, "Usage: %s [OPTIONS] -- PROGRAM [ARGS]\n\n", basename(name));
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
-	fprintf(file, "  -h: Show this help message and exit.\n");
+	fprintf(file, "  -h, --help: Show this help message and exit.\n");
 #if HAS_SUBREAPER
-	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
+	fprintf(file, "  -s, --subreaper: Register as a process subreaper (requires Linux >= 3.4).\n");
 #endif
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
-	fprintf(file, "  -g: Send signals to the child's process group.\n");
+	fprintf(file, "  -g, --group: Send signals to the child's process group.\n");
 	fprintf(file, "\n");
 }
 
@@ -158,36 +157,36 @@ void print_usage(char* const name, FILE* const file) {
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
 
-	int c;
-	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
-		switch (c) {
-			case 'h':
-				/* TODO - Shouldn't cause exit with -1 ..*/
+	const char *ch;
+	while ((ch = GETOPT(argc, argv)) != NULL) {
+		GETOPT_SWITCH(ch) {
+			GETOPT_OPT("-h"):
+			GETOPT_OPT("--help"):
 				print_usage(name, stdout);
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
 #if HAS_SUBREAPER
-			case 's':
+			GETOPT_OPT("-s"):
+			GETOPT_OPT("--subreaper"):
 				subreaper++;
 				break;
 #endif
-			case 'v':
+			GETOPT_OPT("-v"):
 				verbosity++;
 				break;
-
-			case 'g':
+			GETOPT_OPT("-g"):
+			GETOPT_OPT("--group"):
 				kill_process_group++;
 				break;
-
-			case '?':
+			GETOPT_MISSING_ARG:
+				/* FALLTHROUGH */
+			GETOPT_DEFAULT:
 				print_usage(name, stderr);
-				return 1;
-			default:
-				/* Should never happen */
 				return 1;
 		}
 	}
 
+	/* Remaining arguments are for the child */
 	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
 	if (*child_args_ptr_ptr == NULL) {
 		PRINT_FATAL("Failed to allocate memory for child args: '%s'", strerror(errno));
@@ -208,6 +207,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 	return 0;
 }
+
 
 int parse_env() {
 #if HAS_SUBREAPER
@@ -405,13 +405,14 @@ int main(int argc, char *argv[]) {
 
 	// Those are passed to functions to get an exitcode back.
 	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
-	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
 
 	/* Parse command line arguments */
 	char* (*child_args_ptr)[];
-	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_exitcode);
+	int parse_fail_exitcode = 1;   // By default, we exit with 1 if parsing fails.
+
+	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_fail_exitcode);
 	if (parse_args_ret) {
-		return parse_exitcode;
+		return parse_fail_exitcode;
 	}
 
 	/* Parse environment */

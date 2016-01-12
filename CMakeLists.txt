@@ -71,9 +71,9 @@ configure_file (
 
 include_directories ("${PROJECT_BINARY_DIR}")
 
-add_executable (tini src/tini.c)
+add_executable (tini src/tini.c src/vendor/libcperciva/getopt.c)
 
-add_executable (tini-static src/tini.c)
+add_executable (tini-static src/tini.c src/vendor/libcperciva/getopt.c)
 set_target_properties (tini-static PROPERTIES LINK_FLAGS "-Wl,--no-export-dynamic -static")
 
 # Installation

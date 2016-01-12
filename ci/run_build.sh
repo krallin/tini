@@ -2,6 +2,7 @@
 # Should be run from the root dir, or SOURCE_DIR should be set.
 set -o errexit
 set -o nounset
+set -o pipefail
 
 # Default compiler
 : ${CC:="gcc"}
@@ -51,13 +52,13 @@ popd
 
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
 for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
-  echo "Smoke test for $tini"
+  echo "Smoke test for ${tini}"
   "${tini}" -h
 
-  echo "Testing $tini with: true"
+  echo "Testing ${tini} with: true"
   "${tini}" -vvv true
 
-  echo "Testing $tini with: false"
+  echo "Testing ${tini} with: false"
   if "${tini}" -vvv false; then
     exit 1
   fi
@@ -70,7 +71,19 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
     exit 1
   fi
 
-  echo "Checking hardening on $tini"
+
+  # Test argument handling
+  echo "Testing argument handling"
+  "${tini}" -g -- ls -l /usr | grep -E "^drwxr-xr-x.*root.*root.*share$" > /dev/null
+  "${tini}" -g -- ls --help | grep "List information" > /dev/null
+
+  # Test long arguments
+  echo "Testing long arguments"
+  "${tini}" --help  > /dev/null
+  "${tini}" --subreaper -- ls --version > /dev/null
+  "${tini}" --group -- ls --version > /dev/null
+
+  echo "Checking hardening on ${tini}"
   hardening-check --nopie --nostackprotector --nobindnow "${tini}"
 done
 
