@@ -152,7 +152,7 @@ def main():
 
     # Valgrind test (we only run this on the dynamic version, because otherwise Valgrind may bring up plenty of errors that are
     # actually from libc)
-    Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/dist/tini", "-v", "--", "ls"], fail_cmd).run()
+    Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/dist/tini", "-v", "--pre", "ls", "--post", "ls","--", "ls"], fail_cmd).run()
 
     # Installation tests (sh -c is used for globbing and &&)
     for image, pkg_manager, extension in [
