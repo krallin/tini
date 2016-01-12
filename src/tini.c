@@ -543,6 +543,7 @@ int main(int argc, char *argv[]) {
 	if (exec_conf.pre_argv_ptr != NULL) {
 		PRINT_INFO("Spawning pre: %s", **exec_conf.pre_argv_ptr);
 		if ((retval = spawn_and_wait(&signal_conf, *exec_conf.pre_argv_ptr))) {
+			PRINT_WARNING("Pre command exited with status != 0");
 			goto post_then_exit;
 		}
 	}
@@ -579,7 +580,8 @@ post_then_exit:
 	/* Post command */
 	if (exec_conf.post_argv_ptr != NULL) {
 		PRINT_INFO("Spawning post: %s", **exec_conf.post_argv_ptr);
-		if (spawn_and_wait(&signal_conf, *exec_conf.post_argv_ptr)) {  // Do *not* set the reval here.
+		// TODO - Consider retval += here... This way we exit with an error if either errored out.
+		if (spawn_and_wait(&signal_conf, *exec_conf.post_argv_ptr)) {  // Do *not* set the retval here.
 			PRINT_WARNING("Post command exited with status != 0");
 		}
 	}
