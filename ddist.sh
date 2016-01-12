@@ -17,7 +17,7 @@ rm -f "${HERE}/dist"/*
 docker build -t "${IMG}" .
 
 # Run test without subreaper support, don't copy build files here
-docker run -it --rm \
+exec docker run -it --rm \
   --volume="${HERE}:${SRC}" \
   -e BUILD_DIR=/tmp/tini-build \
   -e SOURCE_DIR="${SRC}" \

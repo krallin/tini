@@ -12,7 +12,7 @@ HERE=$(cd "${REL_HERE}"; pwd)
 
 IMG="tini"
 
-docker run -it --rm \
+exec docker run -it --rm \
   --volume="${HERE}/dist:/tini" \
   "${IMG}" "$@"
 
