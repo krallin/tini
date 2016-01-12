@@ -31,6 +31,12 @@ typedef struct {
    struct sigaction* const sigttou_action_ptr;
 } signal_configuration_t;
 
+typedef struct {
+	char* (*child_argv_ptr)[];
+	char* (*pre_argv_ptr)[];
+	char* (*post_argv_ptr)[];
+} exec_configuration_t;
+
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
@@ -40,6 +46,7 @@ typedef struct {
 #endif
 
 
+/* TODO - At some points those have to stop being globals */
 #if HAS_SUBREAPER
 static unsigned int subreaper = 0;
 #endif
@@ -60,18 +67,43 @@ static const char reaper_warning[] = "Tini is not running as PID 1 "
 #endif
         "run Tini as PID 1.";
 
-int restore_signals(const signal_configuration_t* const sigconf_ptr) {
-	if (sigprocmask(SIG_SETMASK, sigconf_ptr->sigmask_ptr, NULL)) {
+
+int compute_exitcode(const int status) {
+	/* Returns a sh-style exit code for status, and -1 if no exit code could
+	 * be determined
+	 */
+
+	if (WIFEXITED(status)) {
+		/* Our process exited normally. */
+		PRINT_INFO("Child exited normally (with status '%i')", WEXITSTATUS(status));
+		return WEXITSTATUS(status);
+	}
+
+	if (WIFSIGNALED(status)) {
+		/* Our process was terminated by a signal. Emulate what sh / bash
+		 * would do, which is to return 128 + signal number.
+		 */
+		PRINT_INFO("Child exited with signal (with signal '%s')", strsignal(WTERMSIG(status)));
+		return 128 + WTERMSIG(status);
+	}
+
+	PRINT_FATAL("Child exited for unknown reason");
+	return 1;
+}
+
+
+int restore_signals(const signal_configuration_t* const signal_conf_ptr) {
+	if (sigprocmask(SIG_SETMASK, signal_conf_ptr->sigmask_ptr, NULL)) {
 		PRINT_FATAL("Restoring child signal mask failed: '%s'", strerror(errno));
 		return 1;
 	}
 
-	if (sigaction(SIGTTIN, sigconf_ptr->sigttin_action_ptr, NULL)) {
+	if (sigaction(SIGTTIN, signal_conf_ptr->sigttin_action_ptr, NULL)) {
 		PRINT_FATAL("Restoring SIGTTIN handler failed: '%s'", strerror((errno)));
 		return 1;
 	}
 
-	if (sigaction(SIGTTOU, sigconf_ptr->sigttou_action_ptr, NULL)) {
+	if (sigaction(SIGTTOU, signal_conf_ptr->sigttou_action_ptr, NULL)) {
 		PRINT_FATAL("Restoring SIGTTOU handler failed: '%s'", strerror((errno)));
 		return 1;
 	}
@@ -107,7 +139,7 @@ int isolate_child() {
 }
 
 
-int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
+int spawn(const signal_configuration_t* const signal_conf_ptr, char* const argv[], int* const child_pid_ptr) {
 	pid_t pid;
 
 	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
@@ -124,18 +156,41 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		}
 
 		// Restore all signal handlers to the way they were before we touched them.
-		if (restore_signals(sigconf_ptr)) {
+		if (restore_signals(signal_conf_ptr)) {
 			return 1;
 		}
 
 		execvp(argv[0], argv);
 		PRINT_FATAL("Executing child process '%s' failed: '%s'", argv[0], strerror(errno));
-		return 1;
+		_exit(EXIT_FAILURE);
 	} else {
 		// Parent
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
 		*child_pid_ptr = pid;
 		return 0;
+	}
+}
+
+
+int spawn_and_wait(const signal_configuration_t* const signal_conf_ptr, char* const argv[]) {
+	pid_t child_pid;
+
+	/* Run pre command */
+	if (spawn(signal_conf_ptr, argv, &child_pid)) {
+		return 1;
+	}
+
+	int status;
+	while (1) {
+		if (waitpid(child_pid, &status, 0) < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			PRINT_FATAL("Unexpected error in waitpid: '%s'", strerror(errno));
+			return 1;
+		}
+
+		return compute_exitcode(status);
 	}
 }
 
@@ -150,11 +205,45 @@ void print_usage(char* const name, FILE* const file) {
 #endif
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -g, --group: Send signals to the child's process group.\n");
+	fprintf(file, "  --pre OTHER_PROGRAM: OTHER_PROGRAM to execute prior to launching PROGRAM.\n");
+	fprintf(file, "  --post OTHER_PROGRAM: OTHER_PROGRAM to execute after PROGRAM terminates.\n");
 	fprintf(file, "\n");
 }
 
 
-int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
+int wrap_arg(char* (**argv_ptr_ptr)[], const char* const value_ptr) {
+	/* Unfortunately, execvp expects an array of constant pointers
+	 * to mutable strings (although it doesn't change them), which
+	 * means we need to not only allocate an array here, but also
+	 * copy the optarg over.
+	 */
+
+	/* Allocate an array for the argv. We *could* use constant size here
+	 * since it's always 2, but we might as well be consistent with what
+	 * we do for the child
+	 */
+	*argv_ptr_ptr = calloc(2, sizeof(char*));
+	if (*argv_ptr_ptr == NULL) {
+		PRINT_FATAL("Failed to allocate memory for pre argv: '%s'", strerror(errno));
+		return 1;
+	}
+
+	/* Copy over the optarg into the array, and NULL-terminate the array
+	 * for execvp.
+	 */
+	(**argv_ptr_ptr)[0] = strdup(value_ptr);
+	(**argv_ptr_ptr)[1] = NULL;
+
+	if ((**argv_ptr_ptr)[0] == NULL) {
+		PRINT_FATAL("Failed to allocate memory for pre / post argv[0]: '%s'", strerror(errno));
+		return 1;
+	}
+
+	return 0;
+}
+
+
+int parse_args(const int argc, char* const argv[], exec_configuration_t* const exec_configuration_ptr, int* const parse_exitcode_ptr) {
 	char* name = argv[0];
 
 	const char *ch;
@@ -163,7 +252,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 			GETOPT_OPT("-h"):
 			GETOPT_OPT("--help"):
 				print_usage(name, stdout);
-				*parse_fail_exitcode_ptr = 0;
+				*parse_exitcode_ptr = 0;
 				return 1;
 #if HAS_SUBREAPER
 			GETOPT_OPT("-s"):
@@ -178,7 +267,18 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 			GETOPT_OPT("--group"):
 				kill_process_group++;
 				break;
+			GETOPT_OPTARG("--pre"):
+				if (wrap_arg(&exec_configuration_ptr->pre_argv_ptr, optarg)) {
+					return 1;
+				}
+				break;
+			GETOPT_OPTARG("--post"):
+				if (wrap_arg(&exec_configuration_ptr->post_argv_ptr, optarg)) {
+					return 1;
+				}
+				break;
 			GETOPT_MISSING_ARG:
+				fprintf(stderr, "Missing argument to -%c\n\n", optopt);
 				/* FALLTHROUGH */
 			GETOPT_DEFAULT:
 				print_usage(name, stderr);
@@ -187,20 +287,21 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	}
 
 	/* Remaining arguments are for the child */
-	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
-	if (*child_args_ptr_ptr == NULL) {
-		PRINT_FATAL("Failed to allocate memory for child args: '%s'", strerror(errno));
+	exec_configuration_ptr->child_argv_ptr = calloc(argc-optind+1, sizeof(char*));
+	if (exec_configuration_ptr->child_argv_ptr == NULL) {
+		PRINT_FATAL("Failed to allocate memory for child argv: '%s'", strerror(errno));
 		return 1;
 	}
 
 	int i;
 	for (i = 0; i < argc - optind; i++) {
-		(**child_args_ptr_ptr)[i] = argv[optind+i];
+		(*exec_configuration_ptr->child_argv_ptr)[i] = argv[optind+i];
 	}
-	(**child_args_ptr_ptr)[i] = NULL;
+	(*exec_configuration_ptr->child_argv_ptr)[i] = NULL;
 
 	if (i == 0) {
 		/* User forgot to provide args! */
+		fprintf(stderr, "No program to execute was provided\n\n");
 		print_usage(name, stderr);
 		return 1;
 	}
@@ -260,7 +361,7 @@ void reaper_check () {
 }
 
 
-int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configuration_t* const sigconf_ptr) {
+int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configuration_t* const signal_conf_ptr) {
 	/* Block all signals that are meant to be collected by the main loop */
 	if (sigfillset(parent_sigset_ptr)) {
 		PRINT_FATAL("sigfillset failed: '%s'", strerror(errno));
@@ -277,7 +378,7 @@ int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configurat
 		}
 	}
 
-	if (sigprocmask(SIG_SETMASK, parent_sigset_ptr, sigconf_ptr->sigmask_ptr)) {
+	if (sigprocmask(SIG_SETMASK, parent_sigset_ptr, signal_conf_ptr->sigmask_ptr)) {
 		PRINT_FATAL("sigprocmask failed: '%s'", strerror(errno));
 		return 1;
 	}
@@ -292,12 +393,12 @@ int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configurat
 	ign_action.sa_handler = SIG_IGN;
 	sigemptyset(&ign_action.sa_mask);
 
-	if (sigaction(SIGTTIN, &ign_action, sigconf_ptr->sigttin_action_ptr)) {
+	if (sigaction(SIGTTIN, &ign_action, signal_conf_ptr->sigttin_action_ptr)) {
 		PRINT_FATAL("Failed to ignore SIGTTIN");
 		return 1;
 	}
 
-	if (sigaction(SIGTTOU, &ign_action, sigconf_ptr->sigttou_action_ptr)) {
+	if (sigaction(SIGTTOU, &ign_action, signal_conf_ptr->sigttou_action_ptr)) {
 		PRINT_FATAL("Failed to ignore SIGTTOU");
 		return 1;
 	}
@@ -372,27 +473,17 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 				 */
 				PRINT_DEBUG("Reaped child with pid: '%i'", current_pid);
 				if (current_pid == child_pid) {
-					if (WIFEXITED(current_status)) {
-						/* Our process exited normally. */
-						PRINT_INFO("Main child exited normally (with status '%i')", WEXITSTATUS(current_status));
-						*child_exitcode_ptr = WEXITSTATUS(current_status);
-					} else if (WIFSIGNALED(current_status)) {
-						/* Our process was terminated. Emulate what sh / bash
-						 * would do, which is to return 128 + signal number.
-						 */
-						PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(WTERMSIG(current_status)));
-						*child_exitcode_ptr = 128 + WTERMSIG(current_status);
-					} else {
-						PRINT_FATAL("Main child exited for unknown reason");
+					*child_exitcode_ptr = compute_exitcode(current_status);
+					if (*child_exitcode_ptr == -1) {
+						// Unknown exit reason.
 						return 1;
 					}
 				}
-
-				// Check if other childs have been reaped.
+				// Check if other childs have to be reaped before we exit.
 				continue;
 		}
 
-		/* If we make it here, that's because we did not continue in the switch case. */
+		/* If we make it here, that's because we did not continue in the switch case, or had no children to wait. */
 		break;
 	}
 
@@ -401,23 +492,25 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 
 
 int main(int argc, char *argv[]) {
-	pid_t child_pid;
-
-	// Those are passed to functions to get an exitcode back.
-	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
+	int retval = 10;  // 10 to indicate internal error.
 
 	/* Parse command line arguments */
-	char* (*child_args_ptr)[];
-	int parse_fail_exitcode = 1;   // By default, we exit with 1 if parsing fails.
+	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
+	exec_configuration_t exec_conf = {
+		.child_argv_ptr = NULL,
+		.pre_argv_ptr = NULL,
+		.post_argv_ptr = NULL,
+	};
 
-	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_fail_exitcode);
-	if (parse_args_ret) {
-		return parse_fail_exitcode;
+
+	if (parse_args(argc, argv, &exec_conf, &parse_exitcode)) {
+		retval = parse_exitcode;
+		goto exit;
 	}
 
 	/* Parse environment */
-	if (parse_env()) {
-		return 1;
+	if ((retval = parse_env())) {
+		goto exit;
 	}
 
 	/* Configure signals */
@@ -426,46 +519,84 @@ int main(int argc, char *argv[]) {
 	memset(&sigttin_action, 0, sizeof sigttin_action);
 	memset(&sigttou_action, 0, sizeof sigttou_action);
 
-	signal_configuration_t child_sigconf = {
+	signal_configuration_t signal_conf = {
 		.sigmask_ptr = &child_sigset,
 		.sigttin_action_ptr = &sigttin_action,
 		.sigttou_action_ptr = &sigttou_action,
 	};
 
-	if (configure_signals(&parent_sigset, &child_sigconf)) {
-		return 1;
+	if ((retval = configure_signals(&parent_sigset, &signal_conf))) {
+		goto exit;
 	}
 
 #if HAS_SUBREAPER
 	/* If available and requested, register as a subreaper */
-	if (register_subreaper()) {
-		return 1;
+	if ((retval = register_subreaper())) {
+		goto exit;
 	};
 #endif
 
 	/* Are we going to reap zombies properly? If not, warn. */
 	reaper_check();
 
-	/* Go on */
-	if (spawn(&child_sigconf, *child_args_ptr, &child_pid)) {
-		return 1;
+	/* Pre command */
+	if (exec_conf.pre_argv_ptr != NULL) {
+		PRINT_INFO("Spawning pre: %s", **exec_conf.pre_argv_ptr);
+		if ((retval = spawn_and_wait(&signal_conf, *exec_conf.pre_argv_ptr))) {
+			goto post_then_exit;
+		}
 	}
-	free(child_args_ptr);
 
+	/* Spawn the child */
+	PRINT_INFO("Spawning main: %s", **exec_conf.child_argv_ptr);
+	pid_t child_pid;
+	if ((retval = spawn(&signal_conf, *exec_conf.child_argv_ptr, &child_pid))) {
+		goto post_then_exit;
+	}
+
+
+	/* Main loop, forward signals and wait for the child to exit, all the while reaping zombies */
+	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
 	while (1) {
 		/* Wait for one signal, and forward it */
-		if (wait_and_forward_signal(&parent_sigset, child_pid)) {
-			return 1;
+		if ((retval = wait_and_forward_signal(&parent_sigset, child_pid))) {
+			goto post_then_exit;
 		}
 
 		/* Now, reap zombies */
-		if (reap_zombies(child_pid, &child_exitcode)) {
-			return 1;
+		if ((retval = reap_zombies(child_pid, &child_exitcode))) {
+			goto post_then_exit;
 		}
 
 		if (child_exitcode != -1) {
 			PRINT_TRACE("Exiting: child has exited");
-			return child_exitcode;
+			retval = child_exitcode;
+			goto post_then_exit;
 		}
 	}
+
+post_then_exit:
+	/* Post command */
+	if (exec_conf.post_argv_ptr != NULL) {
+		PRINT_INFO("Spawning post: %s", **exec_conf.post_argv_ptr);
+		if (spawn_and_wait(&signal_conf, *exec_conf.post_argv_ptr)) {  // Do *not* set the reval here.
+			PRINT_WARNING("Post command exited with status != 0");
+		}
+	}
+
+
+exit:
+	free(exec_conf.child_argv_ptr);
+
+	if (exec_conf.pre_argv_ptr != NULL) {
+		free((*exec_conf.pre_argv_ptr)[0]);
+		free(exec_conf.pre_argv_ptr);
+	}
+
+	if (exec_conf.post_argv_ptr != NULL) {
+		free((*exec_conf.post_argv_ptr)[0]);
+		free(exec_conf.post_argv_ptr);
+	}
+
+	return retval;
 }
