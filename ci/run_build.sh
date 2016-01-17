@@ -80,8 +80,11 @@ for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   # Test long arguments
   echo "Testing long arguments"
   "${tini}" --help  > /dev/null
-  "${tini}" --subreaper -- ls --version > /dev/null
   "${tini}" --group -- ls --version > /dev/null
+
+  if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
+    "${tini}" --subreaper -- ls --version > /dev/null
+  fi
 
   echo "Checking hardening on ${tini}"
   hardening-check --nopie --nostackprotector --nobindnow "${tini}"
