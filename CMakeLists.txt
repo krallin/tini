@@ -3,8 +3,8 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 8)
-set (tini_VERSION_PATCH 4)
+set (tini_VERSION_MINOR 9)
+set (tini_VERSION_PATCH 0)
 
 # Extract git version and dirty-ness
 execute_process (

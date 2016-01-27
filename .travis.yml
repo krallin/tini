@@ -46,8 +46,8 @@ deploy:
     - "./dist/tini.asc"
     - "./dist/tini-static"
     - "./dist/tini-static.asc"
-    - "./dist/tini_0.8.4.deb"
-    - "./dist/tini_0.8.4.rpm"
+    - "./dist/tini_0.9.0.deb"
+    - "./dist/tini_0.9.0.rpm"
   on:
     repo: krallin/tini
     tags: true
