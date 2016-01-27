@@ -1,1 +1,3 @@
 dist
+sign.key
+.env

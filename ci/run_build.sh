@@ -11,6 +11,9 @@ set -o nounset
 : ${DIST_DIR:="${SOURCE_DIR}/dist"}
 : ${BUILD_DIR:="/tmp/build"}
 
+# GPG Configuration
+: ${GPG_PASSPHRASE:=""}
+
 
 # Make those paths absolute, and export them for the Python tests to consume.
 export SOURCE_DIR="$(readlink -f "${SOURCE_DIR}")"
@@ -44,7 +47,6 @@ pushd "${BUILD_DIR}"
 make clean
 make
 make package
-
 popd
 
 # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
@@ -104,3 +106,20 @@ pip install psutil python-prctl bitmap
 
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"
+
+# If a signing key is made available, then use it to sign the binaries
+if [[ -f "${SOURCE_DIR}/sign.key" ]]; then
+  echo "Signing binaries"
+  GPG_SIGN_HOMEDIR="${BUILD_DIR}/gpg-sign"
+  GPG_VERIFY_HOMEDIR="${BUILD_DIR}/gpg-verify"
+  mkdir "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
+  chmod 700 "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
+
+  gpg --homedir "${GPG_SIGN_HOMEDIR}" --import "${SOURCE_DIR}/sign.key"
+  gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7
+
+  for tini in "${DIST_DIR}/tini" "${DIST_DIR}/tini-static"; do
+    echo "${GPG_PASSPHRASE}" | gpg --homedir "${GPG_SIGN_HOMEDIR}" --passphrase-fd 0 --armor --detach-sign "${tini}"
+    gpg --homedir "${GPG_VERIFY_HOMEDIR}" --verify "${tini}.asc"
+  done
+fi
