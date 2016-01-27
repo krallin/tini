@@ -1,7 +1,7 @@
 FROM ubuntu:precise
 
 RUN apt-get update \
- && apt-get install --no-install-recommends --yes build-essential git gdb valgrind cmake rpm python-dev libcap-dev python-pip python-virtualenv hardening-includes \
+ && apt-get install --no-install-recommends --yes build-essential git gdb valgrind cmake rpm python-dev libcap-dev python-pip python-virtualenv hardening-includes gnupg \
  && rm -rf /var/lib/apt/lists/*
 
 # Pre-install those here for faster local builds.

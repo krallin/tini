@@ -37,7 +37,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.8.4
+    ENV TINI_VERSION v0.9.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
@@ -54,6 +54,20 @@ Arguments for Tini itself should be passed like `-v` in the following example:
 `/tini -v -- /your/program`.
 
 *NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
+
+
+### Signed binaries ###
+
+The `tini` and `tini-static` binaries are signed using the key `0527A9B7`.
+
+You can verify their signatures using `gpg` (which you may install using
+your package manager):
+
+    ENV TINI_VERSION v0.9.0
+    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
+    RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7 \
+     && gpg --verify /tini.asc
 
 
 ### Alpine Linux Package ###
