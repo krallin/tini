@@ -75,7 +75,7 @@ your package manager):
 On Alpine Linux, you can use the following command to install Tini (currently
 available in `edge`):
 
-    apk add --update --repository http://dl-1.alpinelinux.org/alpine/edge/community/ tini
+    apk add --update --repository http://dl-cdn.alpinelinux.org/alpine/edge/community/ tini
 
 
 ### NixOS ###
