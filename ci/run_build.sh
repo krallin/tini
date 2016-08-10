@@ -107,8 +107,9 @@ pip install psutil python-prctl bitmap
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"
 
-# If a signing key is made available, then use it to sign the binaries
-if [[ -f "${SOURCE_DIR}/sign.key" ]]; then
+# If a signing key and passphrase are made available, then use it to sign the
+# binaries
+if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
   echo "Signing binaries"
   GPG_SIGN_HOMEDIR="${BUILD_DIR}/gpg-sign"
   GPG_VERIFY_HOMEDIR="${BUILD_DIR}/gpg-verify"

@@ -22,5 +22,5 @@ docker run -it --rm \
   -e BUILD_DIR=/tmp/tini-build \
   -e SOURCE_DIR="${SRC}" \
   -e FORCE_SUBREAPER="${FORCE_SUBREAPER}" \
-  -e GPG_PASSPHRASE="${GPG_PASSPHRASE}" \
+  -e GPG_PASSPHRASE="${GPG_PASSPHRASE:=}" \
   "${IMG}" "${SRC}/ci/run_build.sh"
