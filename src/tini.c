@@ -168,7 +168,6 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
 			case 'h':
-				/* TODO - Shouldn't cause exit with -1 ..*/
 				print_usage(name, stdout);
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
