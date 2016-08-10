@@ -15,6 +15,7 @@
 #include <stdbool.h>
 
 #include "tiniConfig.h"
+#include "tiniLicense.h"
 
 #define PRINT_FATAL(...)                         fprintf(stderr, "[FATAL tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN  tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
@@ -33,11 +34,11 @@ typedef struct {
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hsvg"
+#define OPT_STRING "hsvgl"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hvg"
+#define OPT_STRING "hvgl"
 #endif
 
 
@@ -151,7 +152,12 @@ void print_usage(char* const name, FILE* const file) {
 #endif
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
+	fprintf(file, "  -l: Show license and exit.\n");
 	fprintf(file, "\n");
+}
+
+void print_license(FILE* const file) {
+	fwrite(LICENSE, sizeof(char), LICENSE_len, file);
 }
 
 
@@ -178,6 +184,11 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 			case 'g':
 				kill_process_group++;
 				break;
+
+			case 'l':
+				print_license(stdout);
+				*parse_fail_exitcode_ptr = 0;
+				return 1;
 
 			case '?':
 				print_usage(name, stderr);

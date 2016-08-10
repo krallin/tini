@@ -24,6 +24,7 @@ addons:
     - python-virtualenv
     - hardening-includes
     - gnupg
+    - vim-common
 
 env:
   global:
