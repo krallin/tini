@@ -2,6 +2,7 @@
 # Should be run from the root dir, or SOURCE_DIR should be set.
 set -o errexit
 set -o nounset
+set -o pipefail
 
 # Default compiler
 : ${CC:="gcc"}
@@ -53,6 +54,9 @@ popd
 for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
   echo "Smoke test for $tini"
   "${tini}" -h
+
+  echo "Testing $tini for license"
+  "${tini}" -l | grep -i "mit license"
 
   echo "Testing $tini with: true"
   "${tini}" -vvv true
@@ -107,8 +111,9 @@ pip install psutil python-prctl bitmap
 # Run tests
 python "${SOURCE_DIR}/test/run_inner_tests.py"
 
-# If a signing key is made available, then use it to sign the binaries
-if [[ -f "${SOURCE_DIR}/sign.key" ]]; then
+# If a signing key and passphrase are made available, then use it to sign the
+# binaries
+if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
   echo "Signing binaries"
   GPG_SIGN_HOMEDIR="${BUILD_DIR}/gpg-sign"
   GPG_VERIFY_HOMEDIR="${BUILD_DIR}/gpg-verify"

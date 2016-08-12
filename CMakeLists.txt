@@ -3,7 +3,7 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 9)
+set (tini_VERSION_MINOR 10)
 set (tini_VERSION_PATCH 0)
 
 # Extract git version and dirty-ness
@@ -50,6 +50,16 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Werror -Wextra -Wall -pedantic-
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-s")
 
 # Build
+
+execute_process(
+  COMMAND xxd -i "LICENSE" "${PROJECT_BINARY_DIR}/tiniLicense.h"
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+  RESULT_VARIABLE xxd_ret
+)
+
+if(NOT "${xxd_ret}" EQUAL 0)
+	message(SEND_ERROR "xxd on LICENSE failed: ${xxd_ret}")
+endif()
 
 configure_file (
 	"${PROJECT_SOURCE_DIR}/src/tiniConfig.h.in"
