@@ -58,7 +58,7 @@ Arguments for Tini itself should be passed like `-v` in the following example:
 
 ### Signed binaries ###
 
-The `tini` and `tini-static` binaries are signed using the key `0527A9B7`.
+The `tini` and `tini-static` binaries are signed using the key `595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7`.
 
 You can verify their signatures using `gpg` (which you may install using
 your package manager):
@@ -66,7 +66,7 @@ your package manager):
     ENV TINI_VERSION v@tini_VERSION_MAJOR@.@tini_VERSION_MINOR@.@tini_VERSION_PATCH@
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
-    RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7 \
+    RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
      && gpg --verify /tini.asc
 
 

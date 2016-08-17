@@ -117,11 +117,13 @@ if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
   echo "Signing binaries"
   GPG_SIGN_HOMEDIR="${BUILD_DIR}/gpg-sign"
   GPG_VERIFY_HOMEDIR="${BUILD_DIR}/gpg-verify"
+  PGP_KEY_FINGERPRING="595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7"
+  PGP_KEYSERVER="ha.pool.sks-keyservers.net"
   mkdir "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
   chmod 700 "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
 
   gpg --homedir "${GPG_SIGN_HOMEDIR}" --import "${SOURCE_DIR}/sign.key"
-  gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver ha.pool.sks-keyservers.net --recv-keys 0527A9B7
+  gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver $PGP_KEYSERVER --recv-keys $PGP_KEY_FINGERPRINT
 
   for tini in "${DIST_DIR}/tini" "${DIST_DIR}/tini-static"; do
     echo "${GPG_PASSPHRASE}" | gpg --homedir "${GPG_SIGN_HOMEDIR}" --passphrase-fd 0 --armor --detach-sign "${tini}"
