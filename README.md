@@ -216,6 +216,7 @@ Special thanks to:
 
   + [Danilo Bürger][23] for packaging Tini for Alpine
   + [Asko Soukka][24] for packaging Tini for Nix
+  + [nfnty][25] for packaging Tini for Arch Linux
 
 
   [10]: https://github.com/krallin/tini-images
@@ -224,3 +225,4 @@ Special thanks to:
   [22]: https://github.com/dpw
   [23]: https://github.com/danilobuerger
   [24]: https://github.com/datakurre
+  [25]: https://github.com/nfnty/pkgbuilds/tree/master/tini/tini
