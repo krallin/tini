@@ -84,6 +84,13 @@ Using Nix, you can use the following command to install Tini:
 
     nix-env --install tini
 
+### Arch Linux ###
+
+On Arch Linux, there is a package available on the [AUR](https://wiki.archlinux.org/index.php/Arch_User_Repository).
+Install using the [official instructions](https://wiki.archlinux.org/index.php/Arch_User_Repository#Installing_packages)
+or use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
+
+    pacaur -S tini
 
 Options
 -------
