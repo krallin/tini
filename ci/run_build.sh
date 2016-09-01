@@ -123,7 +123,7 @@ if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
   chmod 700 "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
 
   gpg --homedir "${GPG_SIGN_HOMEDIR}" --import "${SOURCE_DIR}/sign.key"
-  gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver $PGP_KEYSERVER --recv-keys $PGP_KEY_FINGERPRINT
+  gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver "$PGP_KEYSERVER" --recv-keys "$PGP_KEY_FINGERPRINT"
 
   for tini in "${DIST_DIR}/tini" "${DIST_DIR}/tini-static"; do
     echo "${GPG_PASSPHRASE}" | gpg --homedir "${GPG_SIGN_HOMEDIR}" --passphrase-fd 0 --armor --detach-sign "${tini}"
