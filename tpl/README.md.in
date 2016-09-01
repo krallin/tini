@@ -121,6 +121,7 @@ Using Nix, you can use the following command to install Tini:
 
     nix-env --install tini
 
+
 ### Debian ###
 
 On Debian (Buster or newer), you can use the following command to install Tini:
@@ -128,6 +129,16 @@ On Debian (Buster or newer), you can use the following command to install Tini:
     apt-get install tini
 
 Note that this installs `/usr/bin/tini` (and `/usr/bin/tini-static`), not `/tini`.
+
+
+### Arch Linux ###
+
+On Arch Linux, there is a package available on the [AUR](https://wiki.archlinux.org/index.php/Arch_User_Repository).
+Install using the [official instructions](https://wiki.archlinux.org/index.php/Arch_User_Repository#Installing_packages)
+or use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
+
+    pacaur -S tini
+
 
 ### Other Platforms ###
 
