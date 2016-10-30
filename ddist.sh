@@ -2,8 +2,6 @@
 set -o errexit
 set -o nounset
 
-: ${FORCE_SUBREAPER:="1"}
-
 REL_HERE=$(dirname "${BASH_SOURCE}")
 HERE=$(cd "${REL_HERE}"; pwd)
 
@@ -21,6 +19,9 @@ docker run -it --rm \
   --volume="${HERE}:${SRC}" \
   -e BUILD_DIR=/tmp/tini-build \
   -e SOURCE_DIR="${SRC}" \
-  -e FORCE_SUBREAPER="${FORCE_SUBREAPER}" \
+  -e FORCE_SUBREAPER="${FORCE_SUBREAPER:="1"}" \
   -e GPG_PASSPHRASE="${GPG_PASSPHRASE:=}" \
+  -e CC="${CC:=gcc}" \
+  -e ARCH_NATIVE="${ARCH_NATIVE-1}" \
+  -e ARCH_SUFFIX="${ARCH_SUFFIX-}" \
   "${IMG}" "${SRC}/ci/run_build.sh"

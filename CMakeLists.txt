@@ -79,6 +79,13 @@ configure_file (
 	@ONLY
 )
 
+configure_file (
+	"${PROJECT_SOURCE_DIR}/tpl/VERSION.in"
+	"${PROJECT_BINARY_DIR}/VERSION"
+	@ONLY
+)
+
+
 include_directories ("${PROJECT_BINARY_DIR}")
 
 add_executable (tini src/tini.c)
