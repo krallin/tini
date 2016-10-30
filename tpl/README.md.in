@@ -84,6 +84,11 @@ Using Nix, you can use the following command to install Tini:
 
     nix-env --install tini
 
+### ARM ###
+
+ARM images are available! Find the list of available platforms under the
+releases tab.
+
 
 Options
 -------
