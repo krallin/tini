@@ -47,7 +47,9 @@ cmake -B"${BUILD_DIR}" -H"${SOURCE_DIR}"
 pushd "${BUILD_DIR}"
 make clean
 make
-make package
+if [[ -n "${ARCH_NATIVE:=}" ]]; then
+  make package
+fi
 popd
 
 pkg_version="$(cat "${BUILD_DIR}/VERSION")"
@@ -144,21 +146,23 @@ for tini in tini tini-static; do
   fi
 done
 
-for pkg_format in deb rpm; do
-  src="${BUILD_DIR}/tini_${pkg_version}.${pkg_format}"
+if [[ -n "${ARCH_NATIVE:=}" ]]; then
+  for pkg_format in deb rpm; do
+    src="${BUILD_DIR}/tini_${pkg_version}.${pkg_format}"
 
-  if [[ -n "${ARCH_SUFFIX:=}" ]]; then
-    to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
-    TINIS+=("$to")
-    cp "$src" "$to"
-  fi
+    if [[ -n "${ARCH_SUFFIX:=}" ]]; then
+      to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
+      TINIS+=("$to")
+      cp "$src" "$to"
+    fi
 
-  if [[ -n "${ARCH_NATIVE:=}" ]]; then
-    to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
-    TINIS+=("$to")
-    cp "$src" "$to"
-  fi
-done
+    if [[ -n "${ARCH_NATIVE:=}" ]]; then
+      to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
+      TINIS+=("$to")
+      cp "$src" "$to"
+    fi
+  done
+fi
 
 echo "Tinis: ${TINIS[*]}"
 
