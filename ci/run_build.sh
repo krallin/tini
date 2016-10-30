@@ -50,82 +50,141 @@ make
 make package
 popd
 
-# Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
-for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
-  echo "Smoke test for $tini"
-  "${tini}" -h
+pkg_version="$(cat "${BUILD_DIR}/VERSION")"
 
-  echo "Testing $tini for license"
-  "${tini}" -l | grep -i "mit license"
+if [[ -n "${ARCH_NATIVE:=}" ]]; then
+  echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE})"
+  echo "Running smoke and internal tests"
 
-  echo "Testing $tini with: true"
-  "${tini}" -vvv true
+  # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
+  for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
+    echo "Smoke test for $tini"
+    "${tini}" -h
 
-  echo "Testing $tini with: false"
-  if "${tini}" -vvv false; then
-    exit 1
+    echo "Testing $tini for license"
+    "${tini}" -l | grep -i "mit license"
+
+    echo "Testing $tini with: true"
+    "${tini}" -vvv true
+
+    echo "Testing $tini with: false"
+    if "${tini}" -vvv false; then
+      exit 1
+    fi
+
+    # Test stdin / stdout are handed over to child
+    echo "Testing pipe"
+    echo "exit 0" | "${tini}" -vvv sh
+    if [[ ! "$?" -eq "0" ]]; then
+      echo "Pipe test failed"
+      exit 1
+    fi
+
+    echo "Checking hardening on $tini"
+    hardening-check --nopie --nostackprotector --nobindnow "${tini}"
+  done
+
+  # Quick package audit
+  if which rpm >/dev/null; then
+    echo "Contents for RPM:"
+    rpm -qlp "${BUILD_DIR}/tini_${pkg_version}.rpm"
+    echo "--"
   fi
 
-  # Test stdin / stdout are handed over to child
-  echo "Testing pipe"
-  echo "exit 0" | "${tini}" -vvv sh
-  if [[ ! "$?" -eq "0" ]]; then
-    echo "Pipe test failed"
-    exit 1
+  if which dpkg >/dev/null; then
+    echo "Contents for DEB:"
+    dpkg --contents "${BUILD_DIR}/tini_${pkg_version}.deb"
+    echo "--"
   fi
 
-  echo "Checking hardening on $tini"
-  hardening-check --nopie --nostackprotector --nobindnow "${tini}"
+  # Compile test code
+  "${CC}" -o "${BUILD_DIR}/sigconf-test" "${SOURCE_DIR}/test/sigconf/sigconf-test.c"
+
+  # Create virtual environment to run tests.
+  # Accept system site packages for faster local builds.
+  VENV="${BUILD_DIR}/venv"
+  virtualenv --system-site-packages "${VENV}"
+
+  # Don't use activate because it does not play nice with nounset
+  export PATH="${VENV}/bin:${PATH}"
+  export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
+
+  # Install test dependencies
+  pip install psutil python-prctl bitmap
+
+  # Run tests
+  python "${SOURCE_DIR}/test/run_inner_tests.py"
+else
+  if [[ ! -n "${ARCH_SUFFIX:=}" ]]; then
+    echo "Built cross package, but $ARCH_SUFFIX is empty!"
+    exit 1
+  fi
+  echo "Built cross package (ARCH_SUFFIX=${ARCH_SUFFIX})"
+  echo "Skipping smoke and internal tests"
+fi
+
+# Now, copy over files to DIST_DIR, with appropriate names depending on the
+# architecture.
+# Handle the DEB / RPM
+mkdir -p "${DIST_DIR}"
+
+TINIS=()
+
+for tini in tini tini-static; do
+  if [[ -n "${ARCH_SUFFIX:=}" ]]; then
+    to="${DIST_DIR}/${tini}-${ARCH_SUFFIX}"
+    TINIS+=("$to")
+    cp "${BUILD_DIR}/${tini}" "$to"
+  fi
+
+  if [[ -n "${ARCH_NATIVE:=}" ]]; then
+    to="${DIST_DIR}/${tini}"
+    TINIS+=("$to")
+    cp "${BUILD_DIR}/${tini}" "$to"
+  fi
 done
 
-# Move files to the dist dir for testing
-mkdir -p "${DIST_DIR}"
-cp "${BUILD_DIR}"/tini{,-static,*.rpm,*deb} "${DIST_DIR}"
+for pkg_format in deb rpm; do
+  src="${BUILD_DIR}/tini_${pkg_version}.${pkg_format}"
 
-# Quick package audit
-if which rpm; then
-  echo "Contents for RPM:"
-  rpm -qlp "${DIST_DIR}/tini"*.rpm
-fi
+  if [[ -n "${ARCH_SUFFIX:=}" ]]; then
+    to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
+    TINIS+=("$to")
+    cp "$src" "$to"
+  fi
 
-if which dpkg; then
-  echo "Contents for DEB:"
-  dpkg --contents "${DIST_DIR}/tini"*deb
-fi
+  if [[ -n "${ARCH_NATIVE:=}" ]]; then
+    to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
+    TINIS+=("$to")
+    cp "$src" "$to"
+  fi
+done
 
-# Compile test code
-"${CC}" -o "${BUILD_DIR}/sigconf-test" "${SOURCE_DIR}/test/sigconf/sigconf-test.c"
+echo "Tinis: ${TINIS[*]}"
 
-# Create virtual environment to run tests.
-# Accept system site packages for faster local builds.
-VENV="${BUILD_DIR}/venv"
-virtualenv --system-site-packages "${VENV}"
-
-# Don't use activate because it does not play nice with nounset
-export PATH="${VENV}/bin:${PATH}"
-export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
-
-# Install test dependencies
-pip install psutil python-prctl bitmap
-
-# Run tests
-python "${SOURCE_DIR}/test/run_inner_tests.py"
+for tini in "${TINIS[@]}"; do
+  echo "${tini}:"
+  sha1sum "$tini"
+  file "$tini"
+  echo "--"
+done
 
 # If a signing key and passphrase are made available, then use it to sign the
 # binaries
 if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
-  echo "Signing binaries"
+  echo "Signing tinis"
   GPG_SIGN_HOMEDIR="${BUILD_DIR}/gpg-sign"
   GPG_VERIFY_HOMEDIR="${BUILD_DIR}/gpg-verify"
   PGP_KEY_FINGERPRINT="595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7"
   PGP_KEYSERVER="ha.pool.sks-keyservers.net"
+
   mkdir "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
   chmod 700 "${GPG_SIGN_HOMEDIR}" "${GPG_VERIFY_HOMEDIR}"
 
   gpg --homedir "${GPG_SIGN_HOMEDIR}" --import "${SOURCE_DIR}/sign.key"
   gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver "$PGP_KEYSERVER" --recv-keys "$PGP_KEY_FINGERPRINT"
 
-  for tini in "${DIST_DIR}/tini" "${DIST_DIR}/tini-static"; do
+  for tini in "${TINIS[@]}"; do
     echo "${GPG_PASSPHRASE}" | gpg --homedir "${GPG_SIGN_HOMEDIR}" --passphrase-fd 0 --armor --detach-sign "${tini}"
     gpg --homedir "${GPG_VERIFY_HOMEDIR}" --verify "${tini}.asc"
   done

@@ -1,8 +1,7 @@
-FROM ubuntu:precise
+FROM ubuntu:trusty
 
-RUN apt-get update \
- && apt-get install --no-install-recommends --yes build-essential git gdb valgrind cmake rpm python-dev libcap-dev python-pip python-virtualenv hardening-includes gnupg vim-common \
- && rm -rf /var/lib/apt/lists/*
+COPY ci/install_deps.sh /install_deps.sh
+RUN /install_deps.sh
 
 # Pre-install those here for faster local builds.
 RUN CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37" pip install psutil python-prctl bitmap
