@@ -81,12 +81,6 @@ configure_file (
 )
 
 configure_file (
-	"${PROJECT_SOURCE_DIR}/tpl/travis.yml.tpl"
-	"${PROJECT_SOURCE_DIR}/.travis.yml"
-	@ONLY
-)
-
-configure_file (
 	"${PROJECT_SOURCE_DIR}/tpl/VERSION.in"
 	"${PROJECT_BINARY_DIR}/VERSION"
 	@ONLY
