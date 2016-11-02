@@ -56,7 +56,7 @@ def main():
             # and will output the error message here.
             assert "zombie reaping won't work" not in err, "Warning message was output!"
         ret = p.wait()
-        assert ret == 0, "Reaping test failed!"
+        assert ret == 0, "Reaping test failed!\nOUT: %s\nERR: %s" % (out, err)
 
 
         # Run the signals test
