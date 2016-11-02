@@ -22,6 +22,7 @@ docker run -it --rm \
   -e FORCE_SUBREAPER="${FORCE_SUBREAPER:="1"}" \
   -e GPG_PASSPHRASE="${GPG_PASSPHRASE:=}" \
   -e CC="${CC:=gcc}" \
+  -e CFLAGS="${CFLAGS-}" \
   -e ARCH_NATIVE="${ARCH_NATIVE-1}" \
   -e ARCH_SUFFIX="${ARCH_SUFFIX-}" \
   -e NO_ARGS="${NO_ARGS-}" \

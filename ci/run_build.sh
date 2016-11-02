@@ -27,13 +27,11 @@ export BUILD_DIR="$(readlink -f "${BUILD_DIR}")"
 : ${FORCE_SUBREAPER:="1"}
 export FORCE_SUBREAPER
 
-
 # Our build platform doesn't have those newer Linux flags, but we want Tini to have subreaper support
 # We also use those in our tests
-CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
 if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
   # If FORCE_SUBREAPER is requested, then we set those CFLAGS for the Tini build
-  export CFLAGS
+  export CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37 ${CFLAGS:-}"
 fi
 
 # Ensure Python output is not buffered (to make tests output clearer)

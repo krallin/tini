@@ -9,6 +9,7 @@ apt-get install --no-install-recommends --yes \
   python-dev libcap-dev python-pip python-virtualenv \
   hardening-includes gnupg vim-common \
   gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross \
-  gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabi libc6-dev-armhf-cross
+  gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabi libc6-dev-armhf-cross \
+  libc6-dev-i386  gcc-multilib
 
 rm -rf /var/lib/apt/lists/*
