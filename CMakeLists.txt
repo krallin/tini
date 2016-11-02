@@ -3,8 +3,15 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 10)
+set (tini_VERSION_MINOR 11)
 set (tini_VERSION_PATCH 0)
+
+# Build options
+option(NO_ARGS "Disable argument parsing" OFF)
+
+if(NO_ARGS)
+	add_definitions(-DTINI_NO_ARGS=1)
+endif()
 
 # Extract git version and dirty-ness
 execute_process (
@@ -74,10 +81,11 @@ configure_file (
 )
 
 configure_file (
-	"${PROJECT_SOURCE_DIR}/tpl/travis.yml.tpl"
-	"${PROJECT_SOURCE_DIR}/.travis.yml"
+	"${PROJECT_SOURCE_DIR}/tpl/VERSION.in"
+	"${PROJECT_BINARY_DIR}/VERSION"
 	@ONLY
 )
+
 
 include_directories ("${PROJECT_BINARY_DIR}")
 
