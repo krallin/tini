@@ -29,18 +29,19 @@ def main():
     src = os.environ["SOURCE_DIR"]
     build = os.environ["BUILD_DIR"]
 
+    args_disabled = os.environ.get("NO_ARGS")
+
     proxy = os.path.join(src, "test", "subreaper-proxy.py")
     tini = os.path.join(build, "tini")
 
     subreaper_support = bool(int(os.environ["FORCE_SUBREAPER"]))
 
-    tests = [([proxy, tini, "--"], {}),]
+    tests = [([proxy, tini], {}),]
 
     if subreaper_support:
-        tests.extend([
-            ([tini, "-s", "--"], {}),
-            ([tini, "--"], {"TINI_SUBREAPER": ""}),
-            ])
+        if not args_disabled:
+            tests.append(([tini, "-s"], {}))
+        tests.append(([tini], {"TINI_SUBREAPER": ""}))
 
     for target, env in tests:
         # Run the reaping test
@@ -71,17 +72,18 @@ def main():
     # Run the process group test
     # This test has Tini spawn a process that ignores SIGUSR1 and spawns a child that doesn't (and waits on the child)
     # We send SIGUSR1 to Tini, and expect the grand-child to terminate, then the child, and then Tini.
-    print "Running process group test"
-    p = subprocess.Popen([tini, '-g', '--', os.path.join(src, "test", "pgroup", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if not args_disabled:
+        print "Running process group test"
+        p = subprocess.Popen([tini, '-g', os.path.join(src, "test", "pgroup", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
-    p.send_signal(signal.SIGUSR1)
-    busy_wait(lambda: p.poll() is not None, 10)
+        busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
+        p.send_signal(signal.SIGUSR1)
+        busy_wait(lambda: p.poll() is not None, 10)
 
 
     # Run failing test
     print "Running zombie reaping failure test (Tini should warn)"
-    p = subprocess.Popen([tini, "--", os.path.join(src, "test", "reaping", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([tini, os.path.join(src, "test", "reaping", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     assert "zombie reaping won't work" in err, "No warning message was output!"
     ret = p.wait()
@@ -91,7 +93,7 @@ def main():
     # Test that the signals are properly in place here.
     print "running signal configuration test"
 
-    p = subprocess.Popen([os.path.join(build, "sigconf-test"), tini, '-g', '--', "cat", "/proc/self/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([os.path.join(build, "sigconf-test"), tini, "cat", "/proc/self/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
 
     # Extract the signal properties, and add a zero at the end.

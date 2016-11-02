@@ -164,6 +164,9 @@ void print_license(FILE* const file) {
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
 
+#if TINI_NO_ARGS
+	*parse_fail_exitcode_ptr = 0;
+#else
 	int c;
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
@@ -197,6 +200,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				return 1;
 		}
 	}
+#endif
 
 	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
 	if (*child_args_ptr_ptr == NULL) {

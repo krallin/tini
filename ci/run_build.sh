@@ -44,7 +44,11 @@ export REAL_PATH="${PATH}"
 export PATH="${SOURCE_DIR}/ci/util:${PATH}"
 
 # Build
-cmake -B"${BUILD_DIR}" -H"${SOURCE_DIR}"
+CMAKE_ARGS=(-B"${BUILD_DIR}" -H"${SOURCE_DIR}")
+if [[ -n "${NO_ARGS:-}" ]]; then
+  CMAKE_ARGS+=(-DNO_ARGS=ON)
+fi
+cmake "${CMAKE_ARGS[@]}"
 
 pushd "${BUILD_DIR}"
 make clean
@@ -56,32 +60,56 @@ popd
 
 pkg_version="$(cat "${BUILD_DIR}/VERSION")"
 
+
 if [[ -n "${ARCH_NATIVE:=}" ]]; then
   echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE})"
   echo "Running smoke and internal tests"
 
+  BIN_TEST_DIR="${BUILD_DIR}/bin-test"
+  mkdir -p "$BIN_TEST_DIR"
+  export PATH="${BIN_TEST_DIR}:${PATH}"
+
   # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
   for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
-    echo "Smoke test for $tini"
-    "${tini}" -h
+    if [[ -n "${NO_ARGS:-}" ]]; then
+      echo "Testing $tini with: true"
+      "${tini}" true
 
-    echo "Testing $tini for license"
-    "${tini}" -l | grep -i "mit license"
+      echo "Testing $tini with: false"
+      if "${tini}" false; then
+        exit 1
+      fi
 
-    echo "Testing $tini with: true"
-    "${tini}" -vvv true
+      # We try running binaries named after flags (both valid and invalid
+      # flags) and test that they run.
+      for flag in h s x; do
+        bin="-${flag}"
+        echo "Testing $tini can run binary: ${bin}"
+        cp "$(which true)" "${BIN_TEST_DIR}/${bin}"
+        "$tini" "$bin"
+      done
+    else
+      echo "Smoke test for $tini"
+      "${tini}" -h
 
-    echo "Testing $tini with: false"
-    if "${tini}" -vvv false; then
-      exit 1
-    fi
+      echo "Testing $tini for license"
+      "${tini}" -l | grep -i "mit license"
 
-    # Test stdin / stdout are handed over to child
-    echo "Testing pipe"
-    echo "exit 0" | "${tini}" -vvv sh
-    if [[ ! "$?" -eq "0" ]]; then
-      echo "Pipe test failed"
-      exit 1
+      echo "Testing $tini with: true"
+      "${tini}" -vvv true
+
+      echo "Testing $tini with: false"
+      if "${tini}" -vvv false; then
+        exit 1
+      fi
+
+      # Test stdin / stdout are handed over to child
+      echo "Testing pipe"
+      echo "exit 0" | "${tini}" -vvv sh
+      if [[ ! "$?" -eq "0" ]]; then
+        echo "Pipe test failed"
+        exit 1
+      fi
     fi
 
     echo "Checking hardening on $tini"

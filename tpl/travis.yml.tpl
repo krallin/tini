@@ -10,9 +10,10 @@ language: generic
 
 env:
   matrix:
-    - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1
-    - CC=arm-linux-gnueabihf-gcc ARCH_SUFFIX=armhf ARCH_NATIVE=
-    - CC=aarch64-linux-gnu-gcc ARCH_SUFFIX=arm64 ARCH_NATIVE=
+    - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 NO_ARGS=
+    - CC=arm-linux-gnueabihf-gcc ARCH_SUFFIX=armhf ARCH_NATIVE= NO_ARGS=
+    - CC=aarch64-linux-gnu-gcc ARCH_SUFFIX=arm64 ARCH_NATIVE= NO_ARGS=
+    - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 NO_ARGS=1
   global:
     - SIGN_BINARIES=1
     - secure: "RKF9Z9gLxp6k/xITqn7ma1E9HfpYcDXuJFf4862WeH9EMnK9lDq+TWnGsQfkIlqh8h9goe7U+BvRiTibj9MiD5u7eluLo3dlwsLxPpYtyswYeLeC1wKKdT5LPGAXbRKomvBalRYMI+dDnGIM4w96mHgGGvx2zZXGkiAQhm6fJ3k="
@@ -35,3 +36,4 @@ deploy:
   on:
     repo: krallin/tini
     tags: true
+    condition: '-z "$NO_ARGS"'

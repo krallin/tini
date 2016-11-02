@@ -6,6 +6,13 @@ set (tini_VERSION_MAJOR 0)
 set (tini_VERSION_MINOR 10)
 set (tini_VERSION_PATCH 0)
 
+# Build options
+option(NO_ARGS "Disable argument parsing" OFF)
+
+if(NO_ARGS)
+	add_definitions(-DTINI_NO_ARGS=1)
+endif()
+
 # Extract git version and dirty-ness
 execute_process (
   COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" log -n 1 --date=local --pretty=format:%h

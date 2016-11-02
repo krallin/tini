@@ -24,4 +24,5 @@ docker run -it --rm \
   -e CC="${CC:=gcc}" \
   -e ARCH_NATIVE="${ARCH_NATIVE-1}" \
   -e ARCH_SUFFIX="${ARCH_SUFFIX-}" \
+  -e NO_ARGS="${NO_ARGS-}" \
   "${IMG}" "${SRC}/ci/run_build.sh"
