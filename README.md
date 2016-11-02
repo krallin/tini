@@ -37,7 +37,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.10.0
+    ENV TINI_VERSION v0.11.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
@@ -63,7 +63,7 @@ The `tini` and `tini-static` binaries are signed using the key `595E85A6B1B4779E
 You can verify their signatures using `gpg` (which you may install using
 your package manager):
 
-    ENV TINI_VERSION v0.10.0
+    ENV TINI_VERSION v0.11.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
     RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
