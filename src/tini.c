@@ -133,8 +133,20 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		}
 
 		execvp(argv[0], argv);
-		PRINT_FATAL("Executing child process '%s' failed: '%s'", argv[0], strerror(errno));
-		return 1;
+	    	// execvp will only return on an error so make sure that we check the errno
+		// and exit with the correct return status for the error that we encountered
+		int status = 1;
+		switch errno {
+		case ENOENT:
+			status = 127;
+			break;
+            	case ENOEXEC:
+		case EACCES:
+			status = 126;
+			break;
+		}
+		fprintf(stderr, "%s\n", strerror(errno));
+		return status;
 	} else {
 		// Parent
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
@@ -468,8 +480,9 @@ int main(int argc, char *argv[]) {
 	reaper_check();
 
 	/* Go on */
-	if (spawn(&child_sigconf, *child_args_ptr, &child_pid)) {
-		return 1;
+	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
+	if (spawn_ret) {
+		return spawn_ret;
 	}
 	free(child_args_ptr);
 
