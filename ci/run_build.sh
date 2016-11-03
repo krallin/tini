@@ -71,6 +71,9 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
 
   # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
   for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
+    echo "Testing ${tini} --version"
+    "$tini" --version | grep "tini version"
+
     if [[ -n "${NO_ARGS:-}" ]]; then
       echo "Testing $tini with: true"
       "${tini}" true
@@ -88,6 +91,12 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
         cp "$(which true)" "${BIN_TEST_DIR}/${bin}"
         "$tini" "$bin"
       done
+
+      echo "Testing $tini can run binary --version if args are given"
+      cp "$(which true)" "${BIN_TEST_DIR}/--version"
+      if "$tini" "--version" --foo | grep "tini version"; then
+        exit 1
+      fi
     else
       echo "Smoke test for $tini"
       "${tini}" -h
