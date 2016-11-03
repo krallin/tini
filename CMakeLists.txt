@@ -3,7 +3,7 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 11)
+set (tini_VERSION_MINOR 12)
 set (tini_VERSION_PATCH 0)
 
 # Build options
