@@ -41,6 +41,8 @@ typedef struct {
 #define OPT_STRING "hvgl"
 #endif
 
+#define TINI_VERSION_STRING "tini version " TINI_VERSION TINI_GIT
+
 
 #if HAS_SUBREAPER
 static unsigned int subreaper = 0;
@@ -141,9 +143,8 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 	}
 }
 
-
 void print_usage(char* const name, FILE* const file) {
-	fprintf(file, "%s (version %s%s)\n", basename(name), TINI_VERSION, TINI_GIT);
+	fprintf(file, "%s (%s)\n", basename(name), TINI_VERSION_STRING);
 	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
 	fprintf(file, "  -h: Show this help message and exit.\n");
@@ -163,6 +164,13 @@ void print_license(FILE* const file) {
 
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
+
+	// We handle --version if it's the *only* argument provided.
+	if (argc == 2 && strcmp("--version", argv[1]) == 0) {
+		*parse_fail_exitcode_ptr = 0;
+		fprintf(stdout, "%s\n", TINI_VERSION_STRING);
+		return 1;
+	}
 
 #if TINI_NO_ARGS
 	*parse_fail_exitcode_ptr = 0;
