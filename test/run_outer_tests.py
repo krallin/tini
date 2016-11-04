@@ -65,15 +65,19 @@ class Command(object):
 
 
 def attach_and_type_exit_0(name):
+    print "Attaching to {0} to exit 0".format(name)
     p = pexpect.spawn("docker attach {0}".format(name))
     p.sendline('')
     p.sendline('exit 0')
+    p.close()
 
 
 def attach_and_issue_ctrl_c(name):
+    print "Attaching to {0} to CTRL+C".format(name)
     p = pexpect.spawn("docker attach {0}".format(name))
     p.expect_exact('#')
     p.sendintr()
+    p.close()
 
 
 def test_tty_handling(img, name, base_cmd, fail_cmd, container_command, exit_function, expect_exit_code):
@@ -83,7 +87,11 @@ def test_tty_handling(img, name, base_cmd, fail_cmd, container_command, exit_fun
     shell_ready_event = threading.Event()
 
     def spawn():
-        p = pexpect.spawn(" ".join(base_cmd + ["--tty", "--interactive", img, "/tini/dist/tini", "-vvv", "--", container_command]))
+        cmd = base_cmd + ["--tty", "--interactive", img, "/tini/dist/tini"]
+        if os.environ.get("MINIMAL") is None:
+            cmd.append("--")
+        cmd.append(container_command)
+        p = pexpect.spawn(" ".join(cmd))
         p.expect_exact("#")
         shell_ready_event.set()
         rc.value = p.wait()
@@ -112,6 +120,7 @@ def test_tty_handling(img, name, base_cmd, fail_cmd, container_command, exit_fun
 def main():
     img = sys.argv[1]
     name = "{0}-test".format(img)
+    args_disabled = os.environ.get("MINIMAL")
 
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -129,8 +138,8 @@ def main():
     for entrypoint in ["/tini/dist/tini", "/tini/dist/tini-static"]:
         functional_base_cmd = base_cmd + [
             "--entrypoint={0}".format(entrypoint),
+            "-e", "TINI_VERBOSITY=3",
             img,
-            "-vvv",
         ]
 
         # Reaping test
@@ -139,20 +148,24 @@ def main():
         # Signals test
         for sig, retcode in [("INT", 1), ("TERM", 143)]:
             Command(
-                functional_base_cmd + ["--", "/tini/test/signals/test.py"],
+                functional_base_cmd + ["/tini/test/signals/test.py"],
                 fail_cmd,
                 ["docker", "kill", "-s", sig, name],
                 2
             ).run(timeout=10, retcode=retcode)
 
         # Exit code test
-        Command(functional_base_cmd + ["-z"], fail_cmd).run(retcode=1)
-        Command(functional_base_cmd + ["--", "zzzz"], fail_cmd).run(retcode=1)
-        Command(functional_base_cmd + ["-h"], fail_cmd).run()
+        Command(functional_base_cmd + ["-z"], fail_cmd).run(retcode=127 if args_disabled else 1)
+        Command(functional_base_cmd + ["-h"], fail_cmd).run(retcode=127 if args_disabled else 0)
+        Command(functional_base_cmd + ["zzzz"], fail_cmd).run(retcode=127)
 
     # Valgrind test (we only run this on the dynamic version, because otherwise Valgrind may bring up plenty of errors that are
     # actually from libc)
-    Command(functional_base_cmd + ["--", "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/dist/tini", "-v", "--", "ls"], fail_cmd).run()
+    Command(base_cmd + [img, "valgrind", "--leak-check=full", "--error-exitcode=1", "/tini/dist/tini", "ls"], fail_cmd).run()
+
+    # Test tty handling
+    test_tty_handling(img, name, base_cmd, fail_cmd, "dash", attach_and_type_exit_0, 0)
+    test_tty_handling(img, name, base_cmd, fail_cmd, "dash -c 'while true; do echo \#; sleep 0.1; done'", attach_and_issue_ctrl_c, 128 + signal.SIGINT)
 
     # Installation tests (sh -c is used for globbing and &&)
     for image, pkg_manager, extension in [
@@ -162,11 +175,6 @@ def main():
             ["centos:7", "rpm", "rpm"],
     ]:
         Command(base_cmd + [image, "sh", "-c", "{0} -i /tini/dist/*.{1} && /usr/bin/tini true".format(pkg_manager, extension)], fail_cmd).run()
-
-
-    # Test tty handling
-    test_tty_handling(img, name, base_cmd, fail_cmd, "dash", attach_and_type_exit_0, 0)
-    test_tty_handling(img, name, base_cmd, fail_cmd, "dash -c 'while true; do echo \#; sleep 0.1; done'", attach_and_issue_ctrl_c, 128 + signal.SIGINT)
 
 
 if __name__ == "__main__":

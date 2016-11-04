@@ -37,7 +37,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.12.0
+    ENV TINI_VERSION v0.13.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
@@ -63,7 +63,7 @@ The `tini` and `tini-static` binaries are signed using the key `595E85A6B1B4779E
 You can verify their signatures using `gpg` (which you may install using
 your package manager):
 
-    ENV TINI_VERSION v0.12.0
+    ENV TINI_VERSION v0.13.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
     RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
@@ -214,18 +214,20 @@ Maintainer:
 
 Contributors:
 
-  + [Tianon Gravi][21]
-  + [David Wragg][22]
+  + [Tianon Gravi][30]
+  + [David Wragg][31]
+  + [Michael Crosby][32]
 
 Special thanks to:
 
-  + [Danilo Bürger][23] for packaging Tini for Alpine
-  + [Asko Soukka][24] for packaging Tini for Nix
+  + [Danilo Bürger][40] for packaging Tini for Alpine
+  + [Asko Soukka][41] for packaging Tini for Nix
 
 
   [10]: https://github.com/krallin/tini-images
   [20]: https://github.com/krallin/
-  [21]: https://github.com/tianon
-  [22]: https://github.com/dpw
-  [23]: https://github.com/danilobuerger
-  [24]: https://github.com/datakurre
+  [30]: https://github.com/tianon
+  [31]: https://github.com/dpw
+  [32]: https://github.com/crosbymichael
+  [40]: https://github.com/danilobuerger
+  [41]: https://github.com/datakurre

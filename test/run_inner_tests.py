@@ -29,7 +29,7 @@ def main():
     src = os.environ["SOURCE_DIR"]
     build = os.environ["BUILD_DIR"]
 
-    args_disabled = os.environ.get("NO_ARGS")
+    args_disabled = os.environ.get("MINIMAL")
 
     proxy = os.path.join(src, "test", "subreaper-proxy.py")
     tini = os.path.join(build, "tini")
@@ -80,10 +80,14 @@ def main():
         p.send_signal(signal.SIGUSR1)
         busy_wait(lambda: p.poll() is not None, 10)
 
-
-    # Run failing test
+    # Run failing test. Force verbosity to 1 so we see the subreaper warning
+    # regardless of whether MINIMAL is set.
     print "Running zombie reaping failure test (Tini should warn)"
-    p = subprocess.Popen([tini, os.path.join(src, "test", "reaping", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(
+        [tini, os.path.join(src, "test", "reaping", "stage_1.py")],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env={'TINI_VERBOSITY': '1'}
+    )
     out, err = p.communicate()
     assert "zombie reaping won't work" in err, "No warning message was output!"
     ret = p.wait()
