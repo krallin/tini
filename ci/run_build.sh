@@ -45,8 +45,8 @@ export PATH="${SOURCE_DIR}/ci/util:${PATH}"
 
 # Build
 CMAKE_ARGS=(-B"${BUILD_DIR}" -H"${SOURCE_DIR}")
-if [[ -n "${NO_ARGS:-}" ]]; then
-  CMAKE_ARGS+=(-DNO_ARGS=ON)
+if [[ -n "${MINIMAL:-}" ]]; then
+  CMAKE_ARGS+=(-DMINIMAL=ON)
 fi
 cmake "${CMAKE_ARGS[@]}"
 
@@ -77,7 +77,15 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
     echo "Testing ${tini} --version"
     "$tini" --version | grep -q "tini version"
 
-    if [[ -n "${NO_ARGS:-}" ]]; then
+    echo "Testing ${tini} without arguments exits with 1"
+    ! "$tini" 2>/dev/null
+
+    echo "Testing ${tini} shows help message"
+    {
+      ! "$tini" 2>&1
+    } | grep -q "supervision of a valid init process"
+
+    if [[ -n "${MINIMAL:-}" ]]; then
       echo "Testing $tini with: true"
       "${tini}" true
 
@@ -86,14 +94,7 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
         exit 1
       fi
 
-      echo "Testing ${tini} without arguments exits with 1"
-      ! "$tini" 2>/dev/null
-
-      echo "Testing ${tini} shows help message"
-      {
-        ! "$tini" 2>&1
-      } | grep -q "supervision of a valid init process"
-
+      echo "Testing ${tini} does not reference options that don't exist"
       ! {
         ! "$tini" 2>&1
       } | grep -q "more verbose"
@@ -126,6 +127,11 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
       if "${tini}" -vvv false; then
         exit 1
       fi
+
+      echo "Testing ${tini} references options that exist"
+      {
+        ! "$tini" 2>&1
+      } | grep -q "more verbose"
     fi
 
     echo "Testing ${tini} supports TINI_VERBOSITY"

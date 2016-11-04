@@ -7,10 +7,10 @@ set (tini_VERSION_MINOR 12)
 set (tini_VERSION_PATCH 0)
 
 # Build options
-option(NO_ARGS "Disable argument parsing" OFF)
+option(MINIMAL "Disable argument parsing and verbose output" OFF)
 
-if(NO_ARGS)
-	add_definitions(-DTINI_NO_ARGS=1)
+if(MINIMAL)
+	add_definitions(-DTINI_MINIMAL=1)
 endif()
 
 # Extract git version and dirty-ness

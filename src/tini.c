@@ -17,7 +17,7 @@
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
-#if TINI_NO_ARGS
+#if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 #define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
@@ -72,7 +72,7 @@ static const char reaper_warning[] = "Tini is not running as PID 1 "
 Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
 To fix the problem, "
 #if HAS_SUBREAPER
-#ifndef TINI_NO_ARGS
+#ifndef TINI_MINIMAL
 "use the -s option "
 #endif
 "or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
@@ -174,7 +174,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "%s (%s)\n", basename(name), TINI_VERSION_STRING);
 
-#if TINI_NO_ARGS
+#if TINI_MINIMAL
 	fprintf(file, "Usage: %s PROGRAM [ARGS] | --version\n\n", basename(name));
 #else
 	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS] | --version\n\n", basename(name));
@@ -185,7 +185,7 @@ void print_usage(char* const name, FILE* const file) {
 
 	fprintf(file, "  --version: Show version and exit.\n");
 
-#if TINI_NO_ARGS
+#if TINI_MINIMAL
 #else
 	fprintf(file, "  -h: Show this help message and exit.\n");
 #if HAS_SUBREAPER
@@ -222,7 +222,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 		return 1;
 	}
 
-#ifndef TINI_NO_ARGS
+#ifndef TINI_MINIMAL
 	int c;
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
