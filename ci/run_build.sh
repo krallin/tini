@@ -131,6 +131,20 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
     echo "Testing ${tini} supports TINI_VERBOSITY"
     TINI_VERBOSITY=3 "$tini" true 2>&1 | grep -q 'Received SIGCHLD'
 
+    echo "Testing ${tini} exits with 127 if the command does not exist"
+    "$tini" foobar123 && rc="$?" || rc="$?"
+    if [[ "$rc" != 127 ]]; then
+      echo "Exit code was: ${rc}"
+      exit 1
+    fi
+
+    echo "Testing ${tini} exits with 126 if the command is not executable"
+    "$tini" /etc && rc="$?" || rc="$?"
+    if [[ "$rc" != 126 ]]; then
+      echo "Exit code was: ${rc}"
+      exit 1
+    fi
+
     # Test stdin / stdout are handed over to child
     echo "Testing ${tini} does not break pipes"
     echo "exit 0" | "${tini}" sh
