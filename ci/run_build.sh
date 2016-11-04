@@ -71,8 +71,11 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
 
   # Smoke tests (actual tests need Docker to run; they don't run within the CI environment)
   for tini in "${BUILD_DIR}/tini" "${BUILD_DIR}/tini-static"; do
+    echo "Smoke test for ${tini}"
+    "$tini" --version
+
     echo "Testing ${tini} --version"
-    "$tini" --version | grep "tini version"
+    "$tini" --version | grep -q "tini version"
 
     if [[ -n "${NO_ARGS:-}" ]]; then
       echo "Testing $tini with: true"
@@ -82,6 +85,18 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
       if "${tini}" false; then
         exit 1
       fi
+
+      echo "Testing ${tini} without arguments exits with 1"
+      ! "$tini" 2>/dev/null
+
+      echo "Testing ${tini} shows help message"
+      {
+        ! "$tini" 2>&1
+      } | grep -q "supervision of a valid init process"
+
+      ! {
+        ! "$tini" 2>&1
+      } | grep -q "more verbose"
 
       # We try running binaries named after flags (both valid and invalid
       # flags) and test that they run.
@@ -94,15 +109,15 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
 
       echo "Testing $tini can run binary --version if args are given"
       cp "$(which true)" "${BIN_TEST_DIR}/--version"
-      if "$tini" "--version" --foo | grep "tini version"; then
+      if "$tini" "--version" --foo | grep -q "tini version"; then
         exit 1
       fi
     else
-      echo "Smoke test for $tini"
+      echo "Testing ${tini} -h"
       "${tini}" -h
 
       echo "Testing $tini for license"
-      "${tini}" -l | grep -i "mit license"
+      "${tini}" -l | grep -q -i "mit license"
 
       echo "Testing $tini with: true"
       "${tini}" -vvv true
@@ -111,14 +126,17 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
       if "${tini}" -vvv false; then
         exit 1
       fi
+    fi
 
-      # Test stdin / stdout are handed over to child
-      echo "Testing pipe"
-      echo "exit 0" | "${tini}" -vvv sh
-      if [[ ! "$?" -eq "0" ]]; then
-        echo "Pipe test failed"
-        exit 1
-      fi
+    echo "Testing ${tini} supports TINI_VERBOSITY"
+    TINI_VERBOSITY=3 "$tini" true 2>&1 | grep -q 'Received SIGCHLD'
+
+    # Test stdin / stdout are handed over to child
+    echo "Testing ${tini} does not break pipes"
+    echo "exit 0" | "${tini}" sh
+    if [[ ! "$?" -eq "0" ]]; then
+      echo "Pipe test failed"
+      exit 1
     fi
 
     echo "Checking hardening on $tini"

@@ -17,11 +17,21 @@
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
+#if TINI_NO_ARGS
+#define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
+#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
+#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define DEFAULT_VERBOSITY 0
+#else
 #define PRINT_FATAL(...)                         fprintf(stderr, "[FATAL tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN  tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 #define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, "[INFO  tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
 #define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, "[DEBUG tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
 #define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, "[TRACE tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
+#define DEFAULT_VERBOSITY 1
+#endif
 
 #define ARRAY_LEN(x)  (sizeof(x) / sizeof(x[0]))
 
@@ -31,6 +41,7 @@ typedef struct {
    struct sigaction* const sigttou_action_ptr;
 } signal_configuration_t;
 
+static unsigned int verbosity = DEFAULT_VERBOSITY;
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
@@ -41,13 +52,14 @@ typedef struct {
 #define OPT_STRING "hvgl"
 #endif
 
+#define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
+
 #define TINI_VERSION_STRING "tini version " TINI_VERSION TINI_GIT
 
 
 #if HAS_SUBREAPER
 static unsigned int subreaper = 0;
 #endif
-static unsigned int verbosity = 1;
 static unsigned int kill_process_group = 0;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
@@ -56,13 +68,16 @@ static const char reaper_warning[] = "Tini is not running as PID 1 "
 #if HAS_SUBREAPER
        "and isn't registered as a child subreaper"
 #endif
-       ".\n\
-        Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
-        To fix the problem, "
+".\n\
+Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\n\
+To fix the problem, "
 #if HAS_SUBREAPER
-        "use -s or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
+#ifndef TINI_NO_ARGS
+"use the -s option "
 #endif
-        "run Tini as PID 1.";
+"or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
+#endif
+"run Tini as PID 1.";
 
 int restore_signals(const signal_configuration_t* const sigconf_ptr) {
 	if (sigprocmask(SIG_SETMASK, sigconf_ptr->sigmask_ptr, NULL)) {
@@ -86,7 +101,7 @@ int restore_signals(const signal_configuration_t* const sigconf_ptr) {
 int isolate_child() {
 	// Put the child into a new process group.
 	if (setpgid(0, 0) < 0) {
-		PRINT_FATAL("setpgid failed: '%s'", strerror(errno));
+		PRINT_FATAL("setpgid failed: %s", strerror(errno));
 		return 1;
 	}
 
@@ -102,7 +117,7 @@ int isolate_child() {
 		if (errno == ENOTTY) {
 			PRINT_DEBUG("tcsetpgrp failed: no tty (ok to proceed)")
 		} else {
-			PRINT_FATAL("tcsetpgrp failed: '%s'", strerror(errno));
+			PRINT_FATAL("tcsetpgrp failed: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -118,7 +133,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 	pid = fork();
 	if (pid < 0) {
-		PRINT_FATAL("Fork failed: '%s'", strerror(errno));
+		PRINT_FATAL("fork failed: %s", strerror(errno));
 		return 1;
 	} else if (pid == 0) {
 
@@ -145,8 +160,20 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "%s (%s)\n", basename(name), TINI_VERSION_STRING);
-	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS]\n\n", basename(name));
+
+#if TINI_NO_ARGS
+	fprintf(file, "Usage: %s PROGRAM [ARGS] | --version\n\n", basename(name));
+#else
+	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS] | --version\n\n", basename(name));
+#endif
 	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
+
+	fprintf(file, "Command line options:\n\n");
+
+	fprintf(file, "  --version: Show version and exit.\n");
+
+#if TINI_NO_ARGS
+#else
 	fprintf(file, "  -h: Show this help message and exit.\n");
 #if HAS_SUBREAPER
 	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
@@ -154,6 +181,16 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -l: Show license and exit.\n");
+#endif
+
+	fprintf(file, "\n");
+
+	fprintf(file, "Environment variables:\n\n");
+#if HAS_SUBREAPER
+	fprintf(file, "  %s: Register as a process subreaper (requires Linux >= 3.4)\n", SUBREAPER_ENV_VAR);
+#endif
+	fprintf(file, "  %s: Set the verbosity level (default: %d)\n", VERBOSITY_ENV_VAR, DEFAULT_VERBOSITY);
+
 	fprintf(file, "\n");
 }
 
@@ -172,9 +209,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 		return 1;
 	}
 
-#if TINI_NO_ARGS
-	*parse_fail_exitcode_ptr = 0;
-#else
+#ifndef TINI_NO_ARGS
 	int c;
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
@@ -237,6 +272,12 @@ int parse_env() {
 		subreaper++;
 	}
 #endif
+
+	char* env_verbosity = getenv(VERBOSITY_ENV_VAR);
+	if (env_verbosity != NULL) {
+		verbosity = atoi(env_verbosity);
+	}
+
 	return 0;
 }
 
@@ -468,7 +509,7 @@ int main(int argc, char *argv[]) {
 	reaper_check();
 
 	/* Go on */
-	if (spawn(&child_sigconf, *child_args_ptr, &child_pid)) {
+	if(spawn(&child_sigconf, *child_args_ptr, &child_pid)) {
 		return 1;
 	}
 	free(child_args_ptr);
