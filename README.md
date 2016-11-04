@@ -214,18 +214,20 @@ Maintainer:
 
 Contributors:
 
-  + [Tianon Gravi][21]
-  + [David Wragg][22]
+  + [Tianon Gravi][30]
+  + [David Wragg][31]
+  + [Michael Crosby][32]
 
 Special thanks to:
 
-  + [Danilo Bürger][23] for packaging Tini for Alpine
-  + [Asko Soukka][24] for packaging Tini for Nix
+  + [Danilo Bürger][40] for packaging Tini for Alpine
+  + [Asko Soukka][41] for packaging Tini for Nix
 
 
   [10]: https://github.com/krallin/tini-images
   [20]: https://github.com/krallin/
-  [21]: https://github.com/tianon
-  [22]: https://github.com/dpw
-  [23]: https://github.com/danilobuerger
-  [24]: https://github.com/datakurre
+  [30]: https://github.com/tianon
+  [31]: https://github.com/dpw
+  [32]: https://github.com/crosbymichael
+  [40]: https://github.com/danilobuerger
+  [41]: https://github.com/datakurre
