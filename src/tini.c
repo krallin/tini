@@ -208,9 +208,14 @@ void print_usage(char* const name, FILE* const file) {
 }
 
 void print_license(FILE* const file) {
-	fwrite(LICENSE, sizeof(char), LICENSE_len, file);
+    if(LICENSE_len > fwrite(LICENSE, sizeof(char), LICENSE_len, file)) {
+        // Don't handle this error for now, since parse_args won't care
+        // about the return value. We do need to check it to compile with
+        // older glibc, though.
+        // See: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509
+        // See: http://sourceware.org/bugzilla/show_bug.cgi?id=11959
+    }
 }
-
 
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
