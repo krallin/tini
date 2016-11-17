@@ -118,7 +118,7 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
       "${tini}" -h
 
       echo "Testing $tini for license"
-      "${tini}" -l | grep -q -i "mit license"
+      "$tini" -l | diff - "${SOURCE_DIR}/LICENSE"
 
       echo "Testing $tini with: true"
       "${tini}" -vvv true
