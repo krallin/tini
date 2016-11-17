@@ -58,16 +58,6 @@ set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions 
 
 # Build
 
-execute_process(
-  COMMAND xxd -i "LICENSE" "${PROJECT_BINARY_DIR}/tiniLicense.h"
-  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  RESULT_VARIABLE xxd_ret
-)
-
-if(NOT "${xxd_ret}" EQUAL 0)
-	message(SEND_ERROR "xxd on LICENSE failed: ${xxd_ret}")
-endif()
-
 configure_file (
 	"${PROJECT_SOURCE_DIR}/src/tiniConfig.h.in"
 	"${PROJECT_BINARY_DIR}/tiniConfig.h"
