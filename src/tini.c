@@ -116,6 +116,9 @@ int isolate_child() {
 	if (tcsetpgrp(STDIN_FILENO, getpgrp())) {
 		if (errno == ENOTTY) {
 			PRINT_DEBUG("tcsetpgrp failed: no tty (ok to proceed)")
+		} else if (errno == ENXIO) {
+			// can occur on lx-branded zones
+			PRINT_DEBUG("tcsetpgrp failed: no such device (ok to proceed");
 		} else {
 			PRINT_FATAL("tcsetpgrp failed: %s", strerror(errno));
 			return 1;
