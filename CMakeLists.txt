@@ -4,7 +4,7 @@ project (tini C)
 # Config
 set (tini_VERSION_MAJOR 0)
 set (tini_VERSION_MINOR 13)
-set (tini_VERSION_PATCH 0)
+set (tini_VERSION_PATCH 1)
 
 # Build options
 option(MINIMAL "Disable argument parsing and verbose output" OFF)
