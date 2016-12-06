@@ -217,6 +217,7 @@ Contributors:
   + [Tianon Gravi][30]
   + [David Wragg][31]
   + [Michael Crosby][32]
+  + [Wyatt Preul][33]
 
 Special thanks to:
 
@@ -229,5 +230,6 @@ Special thanks to:
   [30]: https://github.com/tianon
   [31]: https://github.com/dpw
   [32]: https://github.com/crosbymichael
+  [33]: https://github.com/geek
   [40]: https://github.com/danilobuerger
   [41]: https://github.com/datakurre
