@@ -306,7 +306,7 @@ int parse_env() {
 #if HAS_SUBREAPER
 int register_subreaper () {
 	if (subreaper > 0) {
-		if (prctl(PR_SET_CHILD_SUBREAPER)) {
+		if (prctl(PR_SET_CHILD_SUBREAPER, 1)) {
 			if (errno == EINVAL) {
 				PRINT_FATAL("PR_SET_CHILD_SUBREAPER is unavailable on this platform. Are you using Linux >= 3.4?")
 			} else {
