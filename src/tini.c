@@ -156,7 +156,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		// and exit with the correct return status for the error that we encountered
 		// See: http://www.tldp.org/LDP/abs/html/exitcodes.html#EXITCODESREF
 		int status = 1;
-		switch errno {
+		switch (errno) {
 			case ENOENT:
 				status = 127;
 				break;
