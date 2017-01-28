@@ -8,6 +8,7 @@ env:
     - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 MINIMAL=
     - CC=arm-linux-gnueabihf-gcc ARCH_SUFFIX=armhf ARCH_NATIVE= MINIMAL=
     - CC=aarch64-linux-gnu-gcc ARCH_SUFFIX=arm64 ARCH_NATIVE= MINIMAL=
+    - CFLAGS="-m32" ARCH_SUFFIX=i386 ARCH_NATIVE= MINIMAL=
     - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 MINIMAL=1
   global:
     - SIGN_BINARIES=1

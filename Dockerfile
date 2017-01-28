@@ -1,5 +1,7 @@
 FROM ubuntu:trusty
 
+ARG ARCH_SUFFIX
+
 COPY ci/install_deps.sh /install_deps.sh
 RUN /install_deps.sh
 
