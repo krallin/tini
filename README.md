@@ -141,6 +141,22 @@ as PID 1.
 and isn't registered as a subreaper. If you don't see a warning, you're fine.*
 
 
+### Remapping exit codes ###
+
+Tini will reuse the child's exit code when exiting, but occasionally, this may
+not be exactly what you want (e.g. if your child exits with 143 after receiving
+SIGTERM). Notably, this can be an issue with Java apps.
+
+In this case, you can use the `-e` flag to remap an arbitrary exit code to 0.
+You can pass the flag multiple times if needed.
+
+For example:
+
+```
+tini -e 143 -- ...
+```
+
+
 ### Process group killing ###
 
 By default, Tini only kills its immediate child process.  This can be

@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -33,7 +34,15 @@
 #define DEFAULT_VERBOSITY 1
 #endif
 
-#define ARRAY_LEN(x)  (sizeof(x) / sizeof(x[0]))
+#define ARRAY_LEN(x)  (sizeof(x) / sizeof((x)[0]))
+
+#define INT32_BITFIELD_SET(F, i)     ( F[(i / 32)] |=  (1 << (i % 32)) )
+#define INT32_BITFIELD_CLEAR(F, i)   ( F[(i / 32)] &= ~(1 << (i % 32)) )
+#define INT32_BITFIELD_TEST(F, i)    ( F[(i / 32)] &   (1 << (i % 32)) )
+#define INT32_BITFIELD_CHECK_BOUNDS(F, i) do {  assert(i >= 0); assert(ARRAY_LEN(F) > (uint) (i / 32)); } while(0)
+
+#define STATUS_MAX 255
+#define STATUS_MIN 0
 
 typedef struct {
    sigset_t* const sigmask_ptr;
@@ -43,13 +52,15 @@ typedef struct {
 
 static unsigned int verbosity = DEFAULT_VERBOSITY;
 
+static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
+
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hsvwgl"
+#define OPT_STRING "hvwgle:s"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hvwgl"
+#define OPT_STRING "hvwgle:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -199,6 +210,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -w: Print a warning when processes are getting reaped.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
+	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0.\n");
 	fprintf(file, "  -l: Show license and exit.\n");
 #endif
 
@@ -221,6 +233,24 @@ void print_license(FILE* const file) {
         // See: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509
         // See: http://sourceware.org/bugzilla/show_bug.cgi?id=11959
     }
+}
+
+int add_expect_status(char* arg) {
+	long status = 0;
+	char* endptr = NULL;
+	status = strtol(arg, &endptr, 10);
+
+	if ((endptr == NULL) || (*endptr != 0)) {
+		return 1;
+	}
+
+	if ((status < STATUS_MIN) || (status > STATUS_MAX)) {
+		return 1;
+	}
+
+	INT32_BITFIELD_CHECK_BOUNDS(expect_status, status);
+	INT32_BITFIELD_SET(expect_status, status);
+	return 0;
 }
 
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
@@ -256,6 +286,14 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 			case 'g':
 				kill_process_group++;
+				break;
+
+			case 'e':
+				if (add_expect_status(optarg)) {
+					PRINT_FATAL("Not a valid option for -e: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
 				break;
 
 			case 'l':
@@ -476,6 +514,15 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 					} else {
 						PRINT_FATAL("Main child exited for unknown reason");
 						return 1;
+					}
+
+					// Be safe, ensure the status code is indeed between 0 and 255.
+					*child_exitcode_ptr = *child_exitcode_ptr % (STATUS_MAX - STATUS_MIN + 1);
+
+					// If this exitcode was remapped, then set it to 0.
+					INT32_BITFIELD_CHECK_BOUNDS(expect_status, *child_exitcode_ptr);
+					if (INT32_BITFIELD_TEST(expect_status, *child_exitcode_ptr)) {
+						*child_exitcode_ptr = 0;
 					}
 				} else if (warn_on_reap > 0) {
 					PRINT_WARNING("Reaped zombie process with pid=%i", current_pid);

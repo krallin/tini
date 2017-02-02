@@ -37,6 +37,7 @@ fi
 
 echo "CC=${CC}"
 echo "CFLAGS=${CFLAGS}"
+echo "MINIMAL=${MINIMAL-}"
 echo "ARCH_SUFFIX=${ARCH_SUFFIX-}"
 echo "ARCH_NATIVE=${ARCH_NATIVE-}"
 
@@ -63,7 +64,6 @@ fi
 popd
 
 pkg_version="$(cat "${BUILD_DIR}/VERSION")"
-
 
 if [[ -n "${ARCH_NATIVE-}" ]]; then
   echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE-})"
