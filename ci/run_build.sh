@@ -7,7 +7,6 @@ set -o pipefail
 # Default compiler
 : ${CC:="gcc"}
 
-echo "CC=${CC}"
 
 # Paths
 : ${SOURCE_DIR:="."}
@@ -30,11 +29,16 @@ export FORCE_SUBREAPER
 
 # Our build platform doesn't have those newer Linux flags, but we want Tini to have subreaper support
 # We also use those in our tests
-CFLAGS="-DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
+CFLAGS="${CFLAGS-} -DPR_SET_CHILD_SUBREAPER=36 -DPR_GET_CHILD_SUBREAPER=37"
 if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
   # If FORCE_SUBREAPER is requested, then we set those CFLAGS for the Tini build
   export CFLAGS
 fi
+
+echo "CC=${CC}"
+echo "CFLAGS=${CFLAGS}"
+echo "ARCH_SUFFIX=${ARCH_SUFFIX-}"
+echo "ARCH_NATIVE=${ARCH_NATIVE-}"
 
 # Ensure Python output is not buffered (to make tests output clearer)
 export PYTHONUNBUFFERED=1
@@ -53,7 +57,7 @@ cmake "${CMAKE_ARGS[@]}"
 pushd "${BUILD_DIR}"
 make clean
 make
-if [[ -n "${ARCH_NATIVE:=}" ]]; then
+if [[ -n "${ARCH_NATIVE-}" ]]; then
   make package
 fi
 popd
@@ -61,8 +65,8 @@ popd
 pkg_version="$(cat "${BUILD_DIR}/VERSION")"
 
 
-if [[ -n "${ARCH_NATIVE:=}" ]]; then
-  echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE})"
+if [[ -n "${ARCH_NATIVE-}" ]]; then
+  echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE-})"
   echo "Running smoke and internal tests"
 
   BIN_TEST_DIR="${BUILD_DIR}/bin-test"
@@ -194,7 +198,7 @@ if [[ -n "${ARCH_NATIVE:=}" ]]; then
   # Run tests
   python "${SOURCE_DIR}/test/run_inner_tests.py"
 else
-  if [[ ! -n "${ARCH_SUFFIX:=}" ]]; then
+  if [[ ! -n "${ARCH_SUFFIX-}" ]]; then
     echo "Built cross package, but $ARCH_SUFFIX is empty!"
     exit 1
   fi
@@ -210,30 +214,30 @@ mkdir -p "${DIST_DIR}"
 TINIS=()
 
 for tini in tini tini-static; do
-  if [[ -n "${ARCH_SUFFIX:=}" ]]; then
+  if [[ -n "${ARCH_SUFFIX-}" ]]; then
     to="${DIST_DIR}/${tini}-${ARCH_SUFFIX}"
     TINIS+=("$to")
     cp "${BUILD_DIR}/${tini}" "$to"
   fi
 
-  if [[ -n "${ARCH_NATIVE:=}" ]]; then
+  if [[ -n "${ARCH_NATIVE-}" ]]; then
     to="${DIST_DIR}/${tini}"
     TINIS+=("$to")
     cp "${BUILD_DIR}/${tini}" "$to"
   fi
 done
 
-if [[ -n "${ARCH_NATIVE:=}" ]]; then
+if [[ -n "${ARCH_NATIVE-}" ]]; then
   for pkg_format in deb rpm; do
     src="${BUILD_DIR}/tini_${pkg_version}.${pkg_format}"
 
-    if [[ -n "${ARCH_SUFFIX:=}" ]]; then
+    if [[ -n "${ARCH_SUFFIX-}" ]]; then
       to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
       TINIS+=("$to")
       cp "$src" "$to"
     fi
 
-    if [[ -n "${ARCH_NATIVE:=}" ]]; then
+    if [[ -n "${ARCH_NATIVE-}" ]]; then
       to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
       TINIS+=("$to")
       cp "$src" "$to"

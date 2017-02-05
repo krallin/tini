@@ -55,7 +55,7 @@ In Docker, you will want to use an entrypoint so you don't have to remember
 to manually invoke Tini:
 
     # Add Tini
-    ENV TINI_VERSION v0.13.2
+    ENV TINI_VERSION v0.14.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
@@ -81,7 +81,7 @@ The `tini` and `tini-static` binaries are signed using the key `595E85A6B1B4779E
 You can verify their signatures using `gpg` (which you may install using
 your package manager):
 
-    ENV TINI_VERSION v0.13.2
+    ENV TINI_VERSION v0.14.0
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
     RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
@@ -102,10 +102,10 @@ Using Nix, you can use the following command to install Tini:
 
     nix-env --install tini
 
-### ARM ###
+### Other Platforms ###
 
-ARM images are available! Find the list of available platforms under the
-releases tab.
+ARM and 32-bit binaries are available! You can find the complete list of
+available binaries under [the releases tab][11].
 
 
 Options
@@ -245,6 +245,7 @@ Special thanks to:
 
   [0]: https://github.com/krallin/tini/issues/8
   [10]: https://github.com/krallin/tini-images
+  [11]: https://github.com/krallin/tini/releases
   [20]: https://github.com/krallin/
   [30]: https://github.com/tianon
   [31]: https://github.com/dpw
