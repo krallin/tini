@@ -92,8 +92,9 @@ your package manager):
 
 On Alpine Linux, you can use the following command to install Tini:
 
-    apk add --update tini
+    RUN apk add --update tini
     # Tini is now available at /sbin/tini
+    ENTRYPOINT ["/sbin/tini", "--"]
 
 
 ### NixOS ###
