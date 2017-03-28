@@ -6,34 +6,44 @@ set (tini_VERSION_MAJOR 0)
 set (tini_VERSION_MINOR 14)
 set (tini_VERSION_PATCH 0)
 
+set (GIT_PREFIX " - git.")
+
 # Build options
 option(MINIMAL "Disable argument parsing and verbose output" OFF)
+
+# Set VERSION_GIT to INTERNAL so it does not persist across runs of CMake, just
+# like the auto-discovery would.
+set(VERSION_GIT "" CACHE INTERNAL "Override the git revision")
 
 if(MINIMAL)
 	add_definitions(-DTINI_MINIMAL=1)
 endif()
 
 # Extract git version and dirty-ness
-execute_process (
-  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" log -n 1 --date=local --pretty=format:%h
-  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  RESULT_VARIABLE git_version_check_ret
-  OUTPUT_VARIABLE tini_VERSION_GIT
-)
-
-execute_process(
-  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" status --porcelain --untracked-files=no
-  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-  OUTPUT_VARIABLE git_dirty_check_out
-)
-
-if("${git_version_check_ret}" EQUAL 0)
-  set(tini_VERSION_GIT " - git.${tini_VERSION_GIT}")
-  if(NOT "${git_dirty_check_out}" STREQUAL "")
-    set(tini_VERSION_GIT "${tini_VERSION_GIT}-dirty")
-  endif()
+if(VERSION_GIT)
+	set(tini_VERSION_GIT "${GIT_PREFIX}${VERSION_GIT}")
 else()
-  set(tini_VERSION_GIT "")
+	execute_process (
+	  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" log -n 1 --date=local --pretty=format:%h
+	  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+	  RESULT_VARIABLE git_version_check_ret
+	  OUTPUT_VARIABLE tini_VERSION_GIT
+	)
+
+	execute_process(
+	  COMMAND git --git-dir "${PROJECT_SOURCE_DIR}/.git" --work-tree "${PROJECT_SOURCE_DIR}" status --porcelain --untracked-files=no
+	  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+	  OUTPUT_VARIABLE git_dirty_check_out
+	)
+
+	if("${git_version_check_ret}" EQUAL 0)
+		set(tini_VERSION_GIT "${GIT_PREFIX}${tini_VERSION_GIT}")
+		if(NOT "${git_dirty_check_out}" STREQUAL "")
+			set(tini_VERSION_GIT "${tini_VERSION_GIT}-dirty")
+		endif()
+	else()
+		set(tini_VERSION_GIT "")
+	endif()
 endif()
 
 # Flags
