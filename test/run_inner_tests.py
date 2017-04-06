@@ -80,6 +80,37 @@ def main():
         p.send_signal(signal.SIGUSR1)
         busy_wait(lambda: p.poll() is not None, 10)
 
+    # Run a file-change check test
+    # This test has Tini spawn a long sleep, similar to above, at which point, we briefly
+    # sleep ourselves and touch a file underneath
+    if not args_disabled:
+        print "Running file-change tests"
+        t_file = os.path.join(src, "test", ".file_test")
+        try:
+            os.unlink(t_file)
+        except:
+            pass
+
+        p = subprocess.Popen([tini, "-S", "{0}".format(signal.SIGUSR1), "-F", t_file, "sleep", "1000"],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 1, 10)
+        with open(t_file, 'w') as f:
+            f.write('{}'.format(time.time()))
+        busy_wait(lambda: p.poll() is not None, 10)
+
+        p = subprocess.Popen([tini, "-S", "{0}".format(signal.SIGUSR1), "-F", t_file, "sleep", "1000"],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 1, 10)
+        with open(t_file, 'w') as f:
+            f.write('{}'.format(time.time()))
+        busy_wait(lambda: p.poll() is not None, 10)
+
+        p = subprocess.Popen([tini, "-S", "{0}".format(signal.SIGUSR1), "-F", t_file, "sleep", "1000"],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 1, 10)
+        os.unlink(t_file)
+        busy_wait(lambda: p.poll() is not None, 10)
+
     # Run failing test. Force verbosity to 1 so we see the subreaper warning
     # regardless of whether MINIMAL is set.
     print "Running zombie reaping failure test (Tini should warn)"
