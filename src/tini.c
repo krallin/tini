@@ -136,7 +136,28 @@ int isolate_child() {
 
 
 int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
+	int new_stdout_fd = 1;
+	int new_stderr_fd = 2;
+	char *redir_path;
 	pid_t pid;
+
+	redir_path = getenv("REDIR_STDOUT");
+	if (redir_path) {
+		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND);
+		if (new_stdout_fd == -1) {
+			PRINT_FATAL("Failed to open stdout redirect path: %s", strerror(errno));
+			return 1;
+		}
+	}
+
+	redir_path = getenv("REDIR_STDERR");
+	if (redir_path) {
+		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND);
+		if (new_stderr_fd == -1) {
+			PRINT_FATAL("Failed to open stderr redirect path: %s", strerror(errno));
+			return 1;
+		}
+	}
 
 	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
 
@@ -153,6 +174,17 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 		// Restore all signal handlers to the way they were before we touched them.
 		if (restore_signals(sigconf_ptr)) {
+			return 1;
+		}
+
+		// Do the FD swap
+		// No need to set CLO_EXEC on existing stdout, stderr FDs, because we're closing them anyway
+		if (dup2(new_stdout_fd, 1) == -1) {
+			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
+			return 1;
+		}
+		if (dup2(new_stderr_fd, 2) == -1) {
+			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
 			return 1;
 		}
 
