@@ -53,7 +53,7 @@ if(NOT HAS_BUILTIN_FORTIFY)
 	add_definitions(-D_FORTIFY_SOURCE=2)
 endif()
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Werror -Wextra -Wall -pedantic-errors -O2 -fstack-protector --param=ssp-buffer-size=4 -Wformat")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Werror -Wextra -Wall -pedantic-errors -fstack-protector --param=ssp-buffer-size=4 -Wformat")
 set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-s")
 
 # Build
