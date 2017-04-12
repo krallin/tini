@@ -23,6 +23,9 @@
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
+#define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
+#define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
+
 #if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
 #define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
@@ -143,7 +146,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 	redir_path = getenv("REDIR_STDOUT");
 	if (redir_path) {
-		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND);
+		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stdout_fd == -1) {
 			PRINT_FATAL("Failed to open stdout redirect path: %s", strerror(errno));
 			return 1;
@@ -152,7 +155,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 
 	redir_path = getenv("REDIR_STDERR");
 	if (redir_path) {
-		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND);
+		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stderr_fd == -1) {
 			PRINT_FATAL("Failed to open stderr redirect path: %s", strerror(errno));
 			return 1;
