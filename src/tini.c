@@ -14,6 +14,12 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
@@ -483,6 +489,73 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 	return 0;
 }
 
+void maybe_unix_cb() {
+	struct sockaddr_un addr = { 0 };
+	struct msghdr msg = { 0 };
+	char data[] = "hello\n";
+	struct cmsghdr *cmsg;
+	char *socket_path;
+	int rootfd = -1;
+	int sockfd = -1;
+	struct iovec io;
+
+	char buf[CMSG_SPACE(sizeof(rootfd))];
+
+	memset(buf, '\0', sizeof(buf));
+
+	socket_path = getenv("UNIX_CB_PATH");
+	if (!socket_path) {
+		PRINT_INFO("No UNIX_CB_PATH set, not connecting back to callback socket")
+		return;
+	}
+
+	rootfd = open("/", O_RDONLY);
+	if (rootfd == -1) {
+		PRINT_FATAL("Unable to open /: '%s'", strerror(errno));
+		goto error;
+	}
+
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd == -1) {
+		PRINT_FATAL("Unable to open unix socket: '%s'", strerror(errno));
+		goto error;
+	}
+
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+	if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+		PRINT_FATAL("Unable to connect unix socket: '%s'", strerror(errno));
+		goto error;
+	}
+
+	io.iov_base = data;
+	io.iov_len = sizeof(data);
+
+	msg.msg_iov = &io;
+	msg.msg_iovlen = 1;
+	msg.msg_control = buf;
+	msg.msg_controllen = sizeof(buf);
+
+	cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(rootfd));
+	msg.msg_controllen = cmsg->cmsg_len;
+	memcpy(CMSG_DATA(cmsg), &rootfd, sizeof(rootfd));
+
+	if (sendmsg(sockfd, &msg, 0) < 0) {
+		PRINT_FATAL("Unable to send message: '%s'", strerror(errno));
+		goto error;
+	}
+
+	return;
+
+	error:
+	if (rootfd > 0)
+		close(rootfd);
+	if (sockfd > 0)
+		close(sockfd);
+}
 
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
@@ -528,6 +601,9 @@ int main(int argc, char *argv[]) {
 
 	/* Are we going to reap zombies properly? If not, warn. */
 	reaper_check();
+
+	/* Maybe pass our pid to the pid sock */
+	maybe_unix_cb();
 
 	/* Go on */
 	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
