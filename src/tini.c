@@ -25,6 +25,10 @@
 
 #define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
 #define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
+#define REDIRECT_STDERR	"TITUS_REDIRECT_STDERR"
+#define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
+#define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
+
 
 #if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
@@ -144,7 +148,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 	char *redir_path;
 	pid_t pid;
 
-	redir_path = getenv("REDIR_STDOUT");
+	redir_path = getenv(REDIRECT_STDOUT);
 	if (redir_path) {
 		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stdout_fd == -1) {
@@ -153,7 +157,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		}
 	}
 
-	redir_path = getenv("REDIR_STDERR");
+	redir_path = getenv(REDIRECT_STDERR);
 	if (redir_path) {
 		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stderr_fd == -1) {
@@ -538,7 +542,7 @@ void maybe_unix_cb() {
 
 	memset(buf, '\0', sizeof(buf));
 
-	socket_path = getenv("UNIX_CB_PATH");
+	socket_path = getenv(TITUS_CB_PATH);
 	if (!socket_path) {
 		PRINT_INFO("No UNIX_CB_PATH set, not connecting back to callback socket")
 		return;
