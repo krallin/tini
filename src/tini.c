@@ -195,6 +195,11 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 
+		// Unset TINI specific environment variables
+		unsetenv(REDIRECT_STDERR);
+		unsetenv(REDIRECT_STDOUT);
+		unsetenv(TITUS_CB_PATH);
+
 		execvp(argv[0], argv);
 
 		// execvp will only return on an error so make sure that we check the errno
