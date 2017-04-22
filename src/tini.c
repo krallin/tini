@@ -19,6 +19,8 @@
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
@@ -29,6 +31,7 @@
 #define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
 #define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
 
+const char stdioattr[] = "user.stdio";
 
 #if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
@@ -148,11 +151,18 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 	char *redir_path;
 	pid_t pid;
 
+	// So, we might leak file descriptors here. For example, if we successfully wire up the stdout,
+	// but the stderr fd fails. Fortunately, this should make the init in the container bail entirely.
+	// This will have the side-effect of closing all of our file descriptors.
 	redir_path = getenv(REDIRECT_STDOUT);
 	if (redir_path) {
 		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stdout_fd == -1) {
 			PRINT_FATAL("Failed to open stdout redirect path: %s", strerror(errno));
+			return 1;
+		}
+		if (fsetxattr(new_stdout_fd, stdioattr, NULL, 0, 0) == -1) {
+			PRINT_FATAL("Unable to set stdio attribute on stdout redirect: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -162,6 +172,10 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
 		if (new_stderr_fd == -1) {
 			PRINT_FATAL("Failed to open stderr redirect path: %s", strerror(errno));
+			return 1;
+		}
+		if (fsetxattr(new_stderr_fd, stdioattr, NULL, 0, 0) == -1) {
+			PRINT_FATAL("Unable to set stdio attribute on stderr redirect: %s", strerror(errno));
 			return 1;
 		}
 	}
@@ -218,6 +232,11 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		return status;
 	} else {
 		// Parent
+		if (new_stdout_fd != 1)
+			close(new_stdout_fd);
+		if (new_stderr_fd != 2)
+			close(new_stderr_fd);
+
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
 		*child_pid_ptr = pid;
 		return 0;
