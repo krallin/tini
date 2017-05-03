@@ -14,8 +14,24 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
+
 #include "tiniConfig.h"
 #include "tiniLicense.h"
+
+#define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
+#define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
+#define REDIRECT_STDERR	"TITUS_REDIRECT_STDERR"
+#define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
+#define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
+
+const char stdioattr[] = "user.stdio";
 
 #if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
@@ -130,7 +146,39 @@ int isolate_child() {
 
 
 int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
+	int new_stdout_fd = 1;
+	int new_stderr_fd = 2;
+	char *redir_path;
 	pid_t pid;
+
+	// So, we might leak file descriptors here. For example, if we successfully wire up the stdout,
+	// but the stderr fd fails. Fortunately, this should make the init in the container bail entirely.
+	// This will have the side-effect of closing all of our file descriptors.
+	redir_path = getenv(REDIRECT_STDOUT);
+	if (redir_path) {
+		new_stdout_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
+		if (new_stdout_fd == -1) {
+			PRINT_FATAL("Failed to open stdout redirect path: %s", strerror(errno));
+			return 1;
+		}
+		if (fsetxattr(new_stdout_fd, stdioattr, NULL, 0, 0) == -1) {
+			PRINT_FATAL("Unable to set stdio attribute on stdout redirect: %s", strerror(errno));
+			return 1;
+		}
+	}
+
+	redir_path = getenv(REDIRECT_STDERR);
+	if (redir_path) {
+		new_stderr_fd = open(redir_path, O_WRONLY | O_CREAT | O_APPEND, S_IRUGO | S_IWUGO);
+		if (new_stderr_fd == -1) {
+			PRINT_FATAL("Failed to open stderr redirect path: %s", strerror(errno));
+			return 1;
+		}
+		if (fsetxattr(new_stderr_fd, stdioattr, NULL, 0, 0) == -1) {
+			PRINT_FATAL("Unable to set stdio attribute on stderr redirect: %s", strerror(errno));
+			return 1;
+		}
+	}
 
 	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
 
@@ -150,6 +198,22 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 
+		// Do the FD swap
+		// No need to set CLO_EXEC on existing stdout, stderr FDs, because we're closing them anyway
+		if (dup2(new_stdout_fd, 1) == -1) {
+			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
+			return 1;
+		}
+		if (dup2(new_stderr_fd, 2) == -1) {
+			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
+			return 1;
+		}
+
+		// Unset TINI specific environment variables
+		unsetenv(REDIRECT_STDERR);
+		unsetenv(REDIRECT_STDOUT);
+		unsetenv(TITUS_CB_PATH);
+
 		execvp(argv[0], argv);
 
 		// execvp will only return on an error so make sure that we check the errno
@@ -168,6 +232,11 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		return status;
 	} else {
 		// Parent
+		if (new_stdout_fd != 1)
+			close(new_stdout_fd);
+		if (new_stderr_fd != 2)
+			close(new_stderr_fd);
+
 		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
 		*child_pid_ptr = pid;
 		return 0;
@@ -483,6 +552,73 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 	return 0;
 }
 
+void maybe_unix_cb() {
+	struct sockaddr_un addr = { 0 };
+	struct msghdr msg = { 0 };
+	char data[] = "hello\n";
+	struct cmsghdr *cmsg;
+	char *socket_path;
+	int rootfd = -1;
+	int sockfd = -1;
+	struct iovec io;
+
+	char buf[CMSG_SPACE(sizeof(rootfd))];
+
+	memset(buf, '\0', sizeof(buf));
+
+	socket_path = getenv(TITUS_CB_PATH);
+	if (!socket_path) {
+		PRINT_INFO("No UNIX_CB_PATH set, not connecting back to callback socket")
+		return;
+	}
+
+	rootfd = open("/", O_RDONLY);
+	if (rootfd == -1) {
+		PRINT_FATAL("Unable to open /: '%s'", strerror(errno));
+		goto error;
+	}
+
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sockfd == -1) {
+		PRINT_FATAL("Unable to open unix socket: '%s'", strerror(errno));
+		goto error;
+	}
+
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+	if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+		PRINT_FATAL("Unable to connect unix socket: '%s'", strerror(errno));
+		goto error;
+	}
+
+	io.iov_base = data;
+	io.iov_len = sizeof(data);
+
+	msg.msg_iov = &io;
+	msg.msg_iovlen = 1;
+	msg.msg_control = buf;
+	msg.msg_controllen = sizeof(buf);
+
+	cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(rootfd));
+	msg.msg_controllen = cmsg->cmsg_len;
+	memcpy(CMSG_DATA(cmsg), &rootfd, sizeof(rootfd));
+
+	if (sendmsg(sockfd, &msg, 0) < 0) {
+		PRINT_FATAL("Unable to send message: '%s'", strerror(errno));
+		goto error;
+	}
+
+	return;
+
+	error:
+	if (rootfd > 0)
+		close(rootfd);
+	if (sockfd > 0)
+		close(sockfd);
+}
 
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
@@ -528,6 +664,9 @@ int main(int argc, char *argv[]) {
 
 	/* Are we going to reap zombies properly? If not, warn. */
 	reaper_check();
+
+	/* Maybe pass our pid to the pid sock */
+	maybe_unix_cb();
 
 	/* Go on */
 	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
