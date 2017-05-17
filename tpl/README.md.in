@@ -140,7 +140,7 @@ and isn't registered as a subreaper. If you don't see a warning, you're fine.*
 ### Process group killing ###
 
 By default, Tini only kills its immediate child process.  This can be
-inconvenient if sending a signal to that process does have the desired
+inconvenient if sending a signal to that process does not have the desired
 effect.  For example, if you do
 
     docker run krallin/ubuntu-tini sh -c 'sleep 10'
