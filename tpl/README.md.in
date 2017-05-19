@@ -41,6 +41,10 @@ If you'd like more detail on why this is useful, review this issue discussion:
 Using Tini
 ----------
 
+*NOTE: If you are using Docker 1.13 or greater, Tini is included in Docker
+itself. This includes all versions of Docker CE. To enable Tini, just [pass the
+`--init` flag to `docker run`][5].*
+
 *NOTE: There are [pre-built Docker images available for Tini][10]. If
 you're currently using an Ubuntu or CentOS image as your base, you can use
 one of those as a drop-in replacement.*
@@ -245,6 +249,7 @@ Special thanks to:
 
 
   [0]: https://github.com/krallin/tini/issues/8
+  [5]: https://docs.docker.com/engine/reference/commandline/run/
   [10]: https://github.com/krallin/tini-images
   [11]: https://github.com/krallin/tini/releases
   [20]: https://github.com/krallin/
