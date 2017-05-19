@@ -250,6 +250,7 @@ echo "Tinis: ${TINIS[*]}"
 for tini in "${TINIS[@]}"; do
   echo "${tini}:"
   sha1sum "$tini"
+  sha256sum "$tini"
   file "$tini"
   echo "--"
 done
