@@ -22,6 +22,7 @@ script:
   - sudo ./ci/install_deps.sh
   - ./ci/run_build.sh
   - ls -lah "$DIST_DIR"
+  - git diff --exit-code
 
 deploy:
   provider: releases
