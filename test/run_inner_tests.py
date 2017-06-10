@@ -61,12 +61,13 @@ def main():
 
 
         # Run the signals test
-        for signum in [signal.SIGINT, signal.SIGTERM]:
-            print "running signal test for: {0} ({1} with env {2})".format(SIGNUM_TO_SIGNAME[signum], " ".join(target), env)
+        for signum in [signal.SIGTERM, signal.SIGUSR1, signal.SIGUSR2]:
+            print "running signal test for: {0} ({1} with env {2})".format(signum, " ".join(target), env)
             p = subprocess.Popen(target + [os.path.join(src, "test", "signals", "test.py")], env=dict(os.environ, **env))
+            busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) > 1, 10)
             p.send_signal(signum)
             ret = p.wait()
-            assert ret == -signum, "Signals test failed (ret was {0}, expected {1})".format(ret, -signum)
+            assert ret == 128 + signum, "Signals test failed (ret was {0}, expected {1})".format(ret, 128 + signum)
 
 
     # Run the process group test
