@@ -30,6 +30,7 @@
 #define REDIRECT_STDERR	"TITUS_REDIRECT_STDERR"
 #define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
 #define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
+#define TITUS_CONFIRM	"TITUS_CONFIRM"
 
 const char stdioattr[] = "user.stdio";
 
@@ -213,6 +214,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 		unsetenv(REDIRECT_STDERR);
 		unsetenv(REDIRECT_STDOUT);
 		unsetenv(TITUS_CB_PATH);
+		unsetenv(TITUS_CONFIRM);
 
 		execvp(argv[0], argv);
 
@@ -611,11 +613,13 @@ void maybe_unix_cb() {
 		goto error;
 	}
 
-	PRINT_INFO("Waiting to receive message from titus-executor before launching\n");
-	if (recv(sockfd, data, 1, 0) == -1) {
-		PRINT_FATAL("Unable to recv start message from socket: '%s'", strerror(errno));
+	if (getenv(TITUS_CONFIRM)) {
+		PRINT_INFO("Waiting to receive message from titus-executor before launching\n");
+		if (recv(sockfd, data, 1, 0) == -1) {
+			PRINT_FATAL("Unable to recv start message from socket: '%s'", strerror(errno));
+		}
+		PRINT_INFO("Clear to start\n");
 	}
-	PRINT_INFO("Clear to start\n");
 
 	return;
 
