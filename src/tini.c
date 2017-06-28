@@ -611,6 +611,12 @@ void maybe_unix_cb() {
 		goto error;
 	}
 
+	PRINT_INFO("Waiting to receive message from titus-executor before launching\n");
+	if (recv(sockfd, data, 1, 0) == -1) {
+		PRINT_FATAL("Unable to recv start message from socket: '%s'", strerror(errno));
+	}
+	PRINT_INFO("Clear to start\n");
+
 	return;
 
 	error:
