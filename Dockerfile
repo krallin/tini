@@ -1,4 +1,4 @@
-FROM ubuntu:trusty
+FROM ubuntu:xenial
 
 ARG ARCH_SUFFIX
 
