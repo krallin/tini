@@ -29,7 +29,8 @@ docker run -it --rm \
   -e GPG_PASSPHRASE="${GPG_PASSPHRASE:=}" \
   -e CC="${CC:=gcc}" \
   -e CFLAGS="${CFLAGS-}" \
-  -e ARCH_NATIVE="${ARCH_NATIVE-1}" \
+  -e ARCH_NATIVE="${ARCH_NATIVE-}" \
   -e ARCH_SUFFIX="${suffix}" \
   -e MINIMAL="${MINIMAL-}" \
+  -u "$(id -u):$(id -g)" \
   "${IMG}" "${SRC}/ci/run_build.sh"
