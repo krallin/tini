@@ -6,16 +6,16 @@ language: generic
 
 env:
   matrix:
-    - CC=gcc ARCH_SUFFIX= ARCH_NATIVE=1 MINIMAL=
-    - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 MINIMAL=
-    - CC=arm-linux-gnueabi-gcc ARCH_SUFFIX=armel ARCH_NATIVE= MINIMAL=
-    - CC=arm-linux-gnueabihf-gcc ARCH_SUFFIX=armhf ARCH_NATIVE= MINIMAL=
-    - CC=aarch64-linux-gnu-gcc ARCH_SUFFIX=arm64 ARCH_NATIVE= MINIMAL=
-    - CFLAGS="-m32" ARCH_SUFFIX=i386 ARCH_NATIVE= MINIMAL=
-    - CC=powerpc64le-linux-gnu-gcc ARCH_SUFFIX=ppc64el ARCH_NATIVE= MINIMAL=
-    - CC=s390x-linux-gnu-gcc ARCH_SUFFIX=s390x ARCH_NATIVE= MINIMAL=
-    - CC=musl-gcc ARCH_SUFFIX=muslc-amd64 ARCH_NATIVE=1 MINIMAL=
-    - CC=gcc ARCH_SUFFIX=amd64 ARCH_NATIVE=1 MINIMAL=1
+    - ARCH_SUFFIX= CC=gcc ARCH_NATIVE=1 MINIMAL=
+    - ARCH_SUFFIX=amd64 CC=gcc ARCH_NATIVE=1 MINIMAL=
+    - ARCH_SUFFIX=amd64 CC=gcc ARCH_NATIVE=1 MINIMAL=1
+    - ARCH_SUFFIX=arm64 CC=aarch64-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=armel CC=arm-linux-gnueabi-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=armhf CC=arm-linux-gnueabihf-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=i386 CFLAGS="-m32" ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=muslc-amd64 CC=musl-gcc ARCH_NATIVE=1 MINIMAL=
+    - ARCH_SUFFIX=ppc64el CC=powerpc64le-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=s390x CC=s390x-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
   global:
     - secure: "RKF9Z9gLxp6k/xITqn7ma1E9HfpYcDXuJFf4862WeH9EMnK9lDq+TWnGsQfkIlqh8h9goe7U+BvRiTibj9MiD5u7eluLo3dlwsLxPpYtyswYeLeC1wKKdT5LPGAXbRKomvBalRYMI+dDnGIM4w96mHgGGvx2zZXGkiAQhm6fJ3k="
     - DIST_DIR="${PWD}/dist"
