@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
 
 #include <errno.h>
 #include <signal.h>
@@ -16,6 +17,8 @@
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
+
+extern char *optarg;
 
 #if TINI_MINIMAL
 #define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
@@ -41,15 +44,25 @@ typedef struct {
    struct sigaction* const sigttou_action_ptr;
 } signal_configuration_t;
 
+struct file_change_t {
+   const char * filename;
+   dev_t last_dev;
+   ino_t last_ino;
+   time_t last_mtime;
+   time_t last_ctime;
+   struct file_change_t *next;
+};
+typedef struct file_change_t file_change_t;
+
 static unsigned int verbosity = DEFAULT_VERBOSITY;
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hsvgl"
+#define OPT_STRING "hsvglS:F:"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hvgl"
+#define OPT_STRING "hvglS:F:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -61,6 +74,9 @@ static unsigned int verbosity = DEFAULT_VERBOSITY;
 static unsigned int subreaper = 0;
 #endif
 static unsigned int kill_process_group = 0;
+
+static unsigned int file_change_signal = 1;  /* HUP */
+static file_change_t *file_change_files = NULL;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
@@ -196,6 +212,10 @@ void print_usage(char* const name, FILE* const file) {
 #endif
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
+	fprintf(file, "  -S signal: numeric signal to send to child if '-F' files\n"
+	              "             change. (default: 1 => HUP)\n");
+	fprintf(file, "  -F path: file(s) to check for changes for reload signal\n"
+	              "           (may be specified more than once).\n");
 	fprintf(file, "  -l: Show license and exit.\n");
 #endif
 
@@ -220,6 +240,44 @@ void print_license(FILE* const file) {
     }
 }
 
+void add_file_change(char* const filename) {
+	file_change_t *new = NULL, *curr;
+        struct stat file_st;
+
+	// Here we add to a linked list of file_change_t structures
+	// we layout each "structure" as <struct><filename><nul> in
+	// the RAM. We expect only a very few - so a linked list here
+	// is fine.
+	new = malloc(sizeof(file_change_t) + 1 + strlen(filename));
+	new->next = NULL;
+	new->filename = (const char *)(new + 1);
+	// we break the const once...
+	strcpy((char *)(new->filename), filename);
+
+	if(stat(new->filename, &file_st) == 0) {
+		new->last_dev = file_st.st_dev;
+		new->last_ino = file_st.st_ino;
+		new->last_mtime = file_st.st_mtime;
+		new->last_ctime = file_st.st_ctime;
+	} else {
+		// we produce blank records for files that don't
+		// exist or are otherwise not accessible to us,
+		// this way, if they become accessible, we also
+		// signal the reload.
+		new->last_dev = 0;
+		new->last_ino = 0;
+		new->last_mtime = 0;
+		new->last_ctime = 0;
+	}
+
+	if(!file_change_files) {
+		file_change_files = new;
+	} else {
+		for (curr = file_change_files; curr->next != NULL; curr = curr->next);
+		curr->next = new;
+	}
+}
+
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
 
@@ -231,7 +289,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	}
 
 #ifndef TINI_MINIMAL
-	int c;
+	int c, tmpi;
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
 			case 'h':
@@ -249,6 +307,19 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 			case 'g':
 				kill_process_group++;
+				break;
+
+			case 'S':
+				tmpi = atoi(optarg);
+				if(tmpi == 0) {
+					print_usage(name, stderr);
+					return 1;
+				}
+				file_change_signal = tmpi;
+				break;
+
+			case 'F':
+				add_file_change(optarg);
 				break;
 
 			case 'l':
@@ -484,6 +555,45 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 }
 
 
+int kill_on_change_files(pid_t child_pid) {
+	file_change_t *curr;
+	struct stat file_st;
+	char changed = 0;
+
+	// We go through our linked list and figure out what changed
+	for(curr = file_change_files; curr != NULL; curr = curr->next) {
+		if(stat(curr->filename, &file_st) == 0) {
+			if(	curr->last_dev != file_st.st_dev ||
+				curr->last_ino != file_st.st_ino ||
+				curr->last_mtime != file_st.st_mtime ||
+				curr->last_ctime != file_st.st_ctime ||
+				0) {
+				PRINT_DEBUG("Found new/changed file: %s", curr->filename);
+				changed = 1;
+				curr->last_dev = file_st.st_dev;
+				curr->last_ino = file_st.st_ino;
+				curr->last_mtime = file_st.st_mtime;
+				curr->last_ctime = file_st.st_ctime;
+			}
+		} else if(curr->last_ctime != 0) {
+			PRINT_DEBUG("Found deleted file: %s", curr->filename);
+			changed = 1;
+			curr->last_dev = 0;
+			curr->last_ino = 0;
+			curr->last_mtime = 0;
+			curr->last_ctime = 0;
+		}
+	}
+
+	if(changed) {
+		PRINT_INFO("files changed, killing %d with %d", child_pid, file_change_signal);
+		kill(kill_process_group ? -child_pid : child_pid, file_change_signal);
+	}
+
+	return 0;
+}
+
+
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
 
@@ -539,6 +649,11 @@ int main(int argc, char *argv[]) {
 	while (1) {
 		/* Wait for one signal, and forward it */
 		if (wait_and_forward_signal(&parent_sigset, child_pid)) {
+			return 1;
+		}
+
+		/* check the files for changes */
+		if (file_change_files && kill_on_change_files(child_pid)) {
 			return 1;
 		}
 

@@ -1,3 +1,4 @@
 dist
 sign.key
 .env
+test/.file_test
