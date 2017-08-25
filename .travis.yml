@@ -34,6 +34,7 @@ deploy:
     secure: Yk90ANpSPv1iJy8QDXCPwfaSmEr/WIJ3bzhQ6X8JvZjfrwTosbh0HrUzQyeac3nyvNwj7YJRssolOFc21IBKPpCFTZqYxSkuLPU6ysG4HGHgN6YJhOMm4mG4KKJ6741q3DJendhZpalBhCEi+NcZK/PCSD97Vl4OqRjBUged0fs=
   file: "${DIST_DIR}/*"
   file_glob: true
+  skip_cleanup: true
   on:
     repo: krallin/tini
     tags: true
