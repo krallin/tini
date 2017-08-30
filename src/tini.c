@@ -31,6 +31,7 @@
 #define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
 #define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
 #define TITUS_CONFIRM	"TITUS_CONFIRM"
+#define TINI_HANDOFF	"TINI_HANDOFF"
 
 const char stdioattr[] = "user.stdio";
 
@@ -145,6 +146,44 @@ int isolate_child() {
 	return 0;
 }
 
+int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const signal_configuration_t* const sigconf_ptr) {
+	// Restore all signal handlers to the way they were before we touched them.
+	if (restore_signals(sigconf_ptr)) {
+		return 1;
+	}
+
+	// Do the FD swap
+	// No need to set CLO_EXEC on existing stdout, stderr FDs, because we're closing them anyway
+	if (dup2(new_stdout_fd, 1) == -1) {
+		PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
+		return 1;
+	}
+	if (dup2(new_stderr_fd, 2) == -1) {
+		PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
+		return 1;
+	}
+
+	// Unset TINI specific environment variables
+	unsetenv(REDIRECT_STDERR);
+	unsetenv(REDIRECT_STDOUT);
+	unsetenv(TITUS_CB_PATH);
+	unsetenv(TITUS_CONFIRM);
+	unsetenv(TINI_HANDOFF);
+
+	execvp(argv[0], argv);
+
+	// execvp will only return on an error so make sure that we check the errno
+	// and exit with the correct return status for the error that we encountered
+	// See: http://www.tldp.org/LDP/abs/html/exitcodes.html#EXITCODESREF
+	switch (errno) {
+		case ENOENT:
+			return 127;
+		case EACCES:
+			return 126;
+	}
+	PRINT_FATAL("exec %s failed: %s", argv[0], strerror(errno));
+	return 1;
+}
 
 int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
 	int new_stdout_fd = 1;
@@ -180,6 +219,8 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 	}
+	if (getenv(TINI_HANDOFF))
+		return do_execvp(argv, new_stdout_fd, new_stderr_fd, sigconf_ptr);
 
 	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
 
@@ -194,44 +235,7 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 
-		// Restore all signal handlers to the way they were before we touched them.
-		if (restore_signals(sigconf_ptr)) {
-			return 1;
-		}
-
-		// Do the FD swap
-		// No need to set CLO_EXEC on existing stdout, stderr FDs, because we're closing them anyway
-		if (dup2(new_stdout_fd, 1) == -1) {
-			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
-			return 1;
-		}
-		if (dup2(new_stderr_fd, 2) == -1) {
-			PRINT_FATAL("Failed to duplicate stdout FD: %s", strerror(errno));
-			return 1;
-		}
-
-		// Unset TINI specific environment variables
-		unsetenv(REDIRECT_STDERR);
-		unsetenv(REDIRECT_STDOUT);
-		unsetenv(TITUS_CB_PATH);
-		unsetenv(TITUS_CONFIRM);
-
-		execvp(argv[0], argv);
-
-		// execvp will only return on an error so make sure that we check the errno
-		// and exit with the correct return status for the error that we encountered
-		// See: http://www.tldp.org/LDP/abs/html/exitcodes.html#EXITCODESREF
-		int status = 1;
-		switch (errno) {
-			case ENOENT:
-				status = 127;
-				break;
-			case EACCES:
-				status = 126;
-				break;
-		}
-		PRINT_FATAL("exec %s failed: %s", argv[0], strerror(errno));
-		return status;
+		return do_execvp(argv, new_stdout_fd, new_stderr_fd, sigconf_ptr);
 	} else {
 		// Parent
 		if (new_stdout_fd != 1)
