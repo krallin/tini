@@ -113,12 +113,23 @@ def main():
     # This test has Tini spawn a process that ignores SIGUSR1 and spawns a child that doesn't (and waits on the child)
     # We send SIGUSR1 to Tini, and expect the grand-child to terminate, then the child, and then Tini.
     if not args_disabled:
-        print "Running process group test"
+        print "Running process group test (arguments)"
         p = subprocess.Popen([tini, '-g', os.path.join(src, "test", "pgroup", "stage_1.py")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
         p.send_signal(signal.SIGUSR1)
         busy_wait(lambda: p.poll() is not None, 10)
+
+    print "Running process group test (environment variable)"
+    p = subprocess.Popen(
+        [tini, os.path.join(src, "test", "pgroup", "stage_1.py")],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=dict(os.environ, TINI_KILL_PROCESS_GROUP="1")
+    )
+
+    busy_wait(lambda: len(psutil.Process(p.pid).children(recursive=True)) == 2, 10)
+    p.send_signal(signal.SIGUSR1)
+    busy_wait(lambda: p.poll() is not None, 10)
 
     # Run failing test. Force verbosity to 1 so we see the subreaper warning
     # regardless of whether MINIMAL is set.
