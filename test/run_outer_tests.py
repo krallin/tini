@@ -158,6 +158,7 @@ def main():
         Command(functional_base_cmd + ["-z"], fail_cmd).run(retcode=127 if args_disabled else 1)
         Command(functional_base_cmd + ["-h"], fail_cmd).run(retcode=127 if args_disabled else 0)
         Command(functional_base_cmd + ["zzzz"], fail_cmd).run(retcode=127)
+        Command(functional_base_cmd + ["-w"], fail_cmd).run(retcode=127 if args_disabled else 0)
 
     # Valgrind test (we only run this on the dynamic version, because otherwise Valgrind may bring up plenty of errors that are
     # actually from libc)

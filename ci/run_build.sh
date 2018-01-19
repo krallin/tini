@@ -105,7 +105,7 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
 
       # We try running binaries named after flags (both valid and invalid
       # flags) and test that they run.
-      for flag in h s x; do
+      for flag in h s w x; do
         bin="-${flag}"
         echo "Testing $tini can run binary: ${bin}"
         cp "$(which true)" "${BIN_TEST_DIR}/${bin}"
