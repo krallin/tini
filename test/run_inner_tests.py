@@ -57,7 +57,20 @@ def main():
             # and will output the error message here.
             assert "zombie reaping won't work" not in err, "Warning message was output!"
         ret = p.wait()
+        assert "Reaped zombie process with pid=" not in err, "Warning message was output!"
         assert ret == 0, "Reaping test failed!\nOUT: %s\nERR: %s" % (out, err)
+
+
+        if not args_disabled:
+            print "Running reaping display test ({0} with env {1})".format(" ".join(target), env)
+            p = subprocess.Popen(target + ["-w", os.path.join(src, "test", "reaping", "stage_1.py")],
+                                env=dict(os.environ, **env),
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            out, err = p.communicate()
+            ret = p.wait()
+            assert "Reaped zombie process with pid=" in err, "Warning message was output!"
+            assert ret == 0, "Reaping display test failed!\nOUT: %s\nERR: %s" % (out, err)
 
 
         # Run the signals test
@@ -93,7 +106,6 @@ def main():
     assert "zombie reaping won't work" in err, "No warning message was output!"
     ret = p.wait()
     assert ret == 1, "Reaping test succeeded (it should have failed)!"
-
 
     # Test that the signals are properly in place here.
     print "running signal configuration test"
