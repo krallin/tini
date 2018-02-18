@@ -3,8 +3,8 @@ project (tini C)
 
 # Config
 set (tini_VERSION_MAJOR 0)
-set (tini_VERSION_MINOR 16)
-set (tini_VERSION_PATCH 1)
+set (tini_VERSION_MINOR 17)
+set (tini_VERSION_PATCH 0)
 
 # Build options
 option(MINIMAL "Disable argument parsing and verbose output" OFF)
