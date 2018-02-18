@@ -8,7 +8,9 @@ import time
 import psutil
 import bitmap
 import re
+import itertools
 
+DEVNULL = open(os.devnull, 'wb')
 
 SIGNUM_TO_SIGNAME = dict((v, k) for k,v in signal.__dict__.items() if re.match("^SIG[A-Z]+$", k))
 
@@ -35,6 +37,29 @@ def main():
     tini = os.path.join(build, "tini")
 
     subreaper_support = bool(int(os.environ["FORCE_SUBREAPER"]))
+
+    # Run the exit code test. We use POSIXLY_CORRECT here to not need --
+    # until that's the default in Tini anyways.
+    if not args_disabled:
+        print "Running exit code test for {0}".format(tini)
+        for code in range(0, 256):
+            p = subprocess.Popen(
+                [tini, '-e', str(code), '--', 'sh', '-c', "exit {0}".format(code)],
+                stdout=DEVNULL, stderr=DEVNULL
+            )
+            ret = p.wait()
+            assert ret == 0, "Inclusive exit code test failed for %s, exit: %s" % (code, ret)
+
+            other_codes = [x for x in range(0, 256) if x != code]
+            args = list(itertools.chain(*[['-e', str(x)] for x in other_codes]))
+
+            p = subprocess.Popen(
+                [tini] + args + ['sh', '-c', "exit {0}".format(code)],
+                env=dict(os.environ, POSIXLY_CORRECT="1"),
+                stdout=DEVNULL, stderr=DEVNULL
+            )
+            ret = p.wait()
+            assert ret == code, "Exclusive exit code test failed for %s, exit: %s" % (code, ret)
 
     tests = [([proxy, tini], {}),]
 
