@@ -9,6 +9,7 @@ import psutil
 import bitmap
 import re
 import itertools
+import tempfile
 
 DEVNULL = open(os.devnull, 'wb')
 
@@ -133,7 +134,7 @@ def main():
     assert ret == 1, "Reaping test succeeded (it should have failed)!"
 
     # Test that the signals are properly in place here.
-    print "running signal configuration test"
+    print "Running signal configuration test"
 
     p = subprocess.Popen([os.path.join(build, "sigconf-test"), tini, "cat", "/proc/self/status"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
@@ -155,6 +156,21 @@ def main():
         for signum in signals_to_test_for:
             # Use signum - 1 because the bitmap is 0-indexed but represents signals strting at 1
             assert (signum - 1) in props[signal_set_name].nonzero(), "{0} ({1}) is missing in {2}!".format(SIGNUM_TO_SIGNAME[signum], signum, signal_set_name)
+
+    # Test parent death signal handling.
+    if not args_disabled:
+        print "Running parent death signal test"
+        f = tempfile.NamedTemporaryFile()
+        try:
+            p = subprocess.Popen(
+                [os.path.join(src, "test", "pdeathsignal", "stage_1.py"), tini, f.name],
+                stdout=DEVNULL, stderr=DEVNULL
+            )
+            p.wait()
+
+            busy_wait(lambda: open(f.name).read() == "ok", 10)
+        finally:
+            f.close()
 
     print "---------------------------"
     print "All done, tests as expected"

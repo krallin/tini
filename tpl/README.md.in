@@ -175,6 +175,20 @@ closely to what happens when you do ctrl-C etc. in a terminal: The
 signal is sent to the foreground process group.
 
 
+### Parent Death Signal ###
+
+Tini can set its parent death signal, which is the signal Tini should receive
+when *its* parent exits. To set the parent death signal, use the `-p` flag with
+the name of the signal Tini should receive when its parent exits:
+
+```
+tini -p SIGTERM -- ...
+```
+
+*NOTE: See [this PR discussion][12] to learn more about the parent death signal
+and use cases.*
+
+
 More
 ----
 
@@ -257,6 +271,7 @@ Contributors:
   + [David Wragg][31]
   + [Michael Crosby][32]
   + [Wyatt Preul][33]
+  + [Patrick Steinhardt][34]
 
 Special thanks to:
 
@@ -268,10 +283,12 @@ Special thanks to:
   [5]: https://docs.docker.com/engine/reference/commandline/run/
   [10]: https://github.com/krallin/tini-images
   [11]: https://github.com/krallin/tini/releases
+  [12]: https://github.com/krallin/tini/pull/114
   [20]: https://github.com/krallin/
   [30]: https://github.com/tianon
   [31]: https://github.com/dpw
   [32]: https://github.com/crosbymichael
   [33]: https://github.com/geek
+  [34]: https://github.com/pks-t
   [40]: https://github.com/danilobuerger
   [41]: https://github.com/datakurre

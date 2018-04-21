@@ -50,17 +50,51 @@ typedef struct {
    struct sigaction* const sigttou_action_ptr;
 } signal_configuration_t;
 
+static const struct {
+   char *const name;
+   int number;
+} signal_names[] = {
+   { "SIGHUP", SIGHUP },
+   { "SIGINT", SIGINT },
+   { "SIGQUIT", SIGQUIT },
+   { "SIGILL", SIGILL },
+   { "SIGTRAP", SIGTRAP },
+   { "SIGABRT", SIGABRT },
+   { "SIGBUS", SIGBUS },
+   { "SIGFPE", SIGFPE },
+   { "SIGKILL", SIGKILL },
+   { "SIGUSR1", SIGUSR1 },
+   { "SIGSEGV", SIGSEGV },
+   { "SIGUSR2", SIGUSR2 },
+   { "SIGPIPE", SIGPIPE },
+   { "SIGALRM", SIGALRM },
+   { "SIGTERM", SIGTERM },
+   { "SIGCHLD", SIGCHLD },
+   { "SIGCONT", SIGCONT },
+   { "SIGSTOP", SIGSTOP },
+   { "SIGTSTP", SIGTSTP },
+   { "SIGTTIN", SIGTTIN },
+   { "SIGTTOU", SIGTTOU },
+   { "SIGURG", SIGURG },
+   { "SIGXCPU", SIGXCPU },
+   { "SIGXFSZ", SIGXFSZ },
+   { "SIGVTALRM", SIGVTALRM },
+   { "SIGPROF", SIGPROF },
+   { "SIGWINCH", SIGWINCH },
+   { "SIGSYS", SIGSYS },
+};
+
 static unsigned int verbosity = DEFAULT_VERBOSITY;
 
 static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "hvwgle:s"
+#define OPT_STRING "p:hvwgle:s"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "hvwgle:"
+#define OPT_STRING "p:hvwgle:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -71,6 +105,7 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 #if HAS_SUBREAPER
 static unsigned int subreaper = 0;
 #endif
+static unsigned int parent_death_signal = 0;
 static unsigned int kill_process_group = 0;
 
 static unsigned int warn_on_reap = 0;
@@ -207,6 +242,7 @@ void print_usage(char* const name, FILE* const file) {
 #if HAS_SUBREAPER
 	fprintf(file, "  -s: Register as a process subreaper (requires Linux >= 3.4).\n");
 #endif
+	fprintf(file, "  -p SIGNAL: Trigger SIGNAL when parent dies, e.g. \"-p SIGKILL\".\n");
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -w: Print a warning when processes are getting reaped.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
@@ -233,6 +269,20 @@ void print_license(FILE* const file) {
         // See: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509
         // See: http://sourceware.org/bugzilla/show_bug.cgi?id=11959
     }
+}
+
+int set_pdeathsig(char* const arg) {
+	size_t i;
+
+	for (i = 0; i < ARRAY_LEN(signal_names); i++) {
+		if (strcmp(signal_names[i].name, arg) == 0) {
+			/* Signals start at value "1" */
+			parent_death_signal = signal_names[i].number;
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 int add_expect_status(char* arg) {
@@ -276,6 +326,14 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				subreaper++;
 				break;
 #endif
+			case 'p':
+				if (set_pdeathsig(optarg)) {
+					PRINT_FATAL("Not a valid option for -p: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+				break;
+
 			case 'v':
 				verbosity++;
 				break;
@@ -574,6 +632,12 @@ int main(int argc, char *argv[]) {
 	if (configure_signals(&parent_sigset, &child_sigconf)) {
 		return 1;
 	}
+
+	/* Trigger signal on this process when the parent process exits. */
+	if (parent_death_signal && prctl(PR_SET_PDEATHSIG, parent_death_signal)) {
+		PRINT_FATAL("Failed to set up parent death signal");
+		return 1;
+	 }
 
 #if HAS_SUBREAPER
 	/* If available and requested, register as a subreaper */
