@@ -26,6 +26,10 @@
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
+#ifndef CLONE_NEWCGROUP
+#define CLONE_NEWCGROUP		0x02000000	/* New cgroup namespace */
+#endif
+
 #define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
 #define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
 #define REDIRECT_STDERR	"TITUS_REDIRECT_STDERR"
