@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sched.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -32,6 +33,7 @@
 #define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
 #define TITUS_CONFIRM	"TITUS_CONFIRM"
 #define TINI_HANDOFF	"TINI_HANDOFF"
+#define TINI_UNSHARE	"TINI_UNSHARE"
 
 const char stdioattr[] = "user.stdio";
 
@@ -169,6 +171,7 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 	unsetenv(TITUS_CB_PATH);
 	unsetenv(TITUS_CONFIRM);
 	unsetenv(TINI_HANDOFF);
+	unsetenv(TINI_UNSHARE);
 
 	execvp(argv[0], argv);
 
@@ -219,6 +222,16 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 	}
+
+	// Should unshare happen here, or in do_execvp / the child?
+	if (getenv(TINI_UNSHARE)) {
+		if (unshare(CLONE_NEWCGROUP)) {
+			PRINT_FATAL("Unable to unshare new cgroup namespace: %s", strerror(errno));
+			return 1;
+		}
+	}
+
+
 	if (getenv(TINI_HANDOFF))
 		return do_execvp(argv, new_stdout_fd, new_stderr_fd, sigconf_ptr);
 
