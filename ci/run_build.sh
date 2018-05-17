@@ -37,6 +37,7 @@ fi
 
 echo "CC=${CC}"
 echo "CFLAGS=${CFLAGS}"
+echo "MINIMAL=${MINIMAL-}"
 echo "ARCH_SUFFIX=${ARCH_SUFFIX-}"
 echo "ARCH_NATIVE=${ARCH_NATIVE-}"
 
@@ -63,7 +64,6 @@ fi
 popd
 
 pkg_version="$(cat "${BUILD_DIR}/VERSION")"
-
 
 if [[ -n "${ARCH_NATIVE-}" ]]; then
   echo "Built native package (ARCH_NATIVE=${ARCH_NATIVE-})"
@@ -105,7 +105,7 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
 
       # We try running binaries named after flags (both valid and invalid
       # flags) and test that they run.
-      for flag in h s x; do
+      for flag in h s w x; do
         bin="-${flag}"
         echo "Testing $tini can run binary: ${bin}"
         cp "$(which true)" "${BIN_TEST_DIR}/${bin}"
@@ -136,6 +136,14 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
       {
         ! "$tini" 2>&1
       } | grep -q "more verbose"
+
+      echo "Testing $tini with: -- true (should succeed)"
+      "${tini}" -vvv -- true
+
+      echo "Testing $tini with: -- -- true (should fail)"
+      if "${tini}" -vvv -- -- true; then
+        exit 1
+      fi
     fi
 
     echo "Testing ${tini} supports TINI_VERBOSITY"
@@ -164,7 +172,12 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
     fi
 
     echo "Checking hardening on $tini"
-    hardening-check --nopie --nostackprotector --nobindnow "${tini}"
+    hardening_skip=(--nopie --nostackprotector --nobindnow)
+    if [[ "$CC" == "musl-gcc" ]]; then
+      # FORTIFY_SOURCE is a glibc thing
+      hardening_skip=("${hardening_skip[@]}" --nofortify)
+    fi
+    hardening-check  "${hardening_skip[@]}" "${tini}"
   done
 
   # Quick package audit
@@ -193,7 +206,7 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
   export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
 
   # Install test dependencies
-  pip install psutil python-prctl bitmap
+  CC=gcc pip install psutil python-prctl bitmap
 
   # Run tests
   python "${SOURCE_DIR}/test/run_inner_tests.py"
@@ -218,9 +231,7 @@ for tini in tini tini-static; do
     to="${DIST_DIR}/${tini}-${ARCH_SUFFIX}"
     TINIS+=("$to")
     cp "${BUILD_DIR}/${tini}" "$to"
-  fi
-
-  if [[ -n "${ARCH_NATIVE-}" ]]; then
+  else
     to="${DIST_DIR}/${tini}"
     TINIS+=("$to")
     cp "${BUILD_DIR}/${tini}" "$to"
@@ -235,9 +246,7 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
       to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
       TINIS+=("$to")
       cp "$src" "$to"
-    fi
-
-    if [[ -n "${ARCH_NATIVE-}" ]]; then
+    else
       to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
       TINIS+=("$to")
       cp "$src" "$to"
@@ -250,6 +259,7 @@ echo "Tinis: ${TINIS[*]}"
 for tini in "${TINIS[@]}"; do
   echo "${tini}:"
   sha1sum "$tini"
+  sha256sum "$tini"
   file "$tini"
   echo "--"
 done

@@ -47,17 +47,17 @@ class Command(object):
         # Checks
         if thread.is_alive():
             subprocess.check_call(self.fail_cmd, **pipe_kwargs)
-            err =  Exception("Test failed with timeout!")
+            err = Exception("Test failed with timeout!")
 
         elif self.proc.returncode != retcode:
-            err =  Exception("Test failed with unexpected returncode (expected {0}, got {1})".format(retcode, self.proc.returncode))
+            err = Exception("Test failed with unexpected returncode (expected {0}, got {1})".format(retcode, self.proc.returncode))
 
         if err is not None:
             print "FAIL"
             print "--- STDOUT ---"
-            print self.stdout
+            print getattr(self, "stdout", "no stdout")
             print "--- STDERR ---"
-            print self.stderr
+            print getattr(self, "stderr", "no stderr")
             print "--- ... ---"
             raise err
         else:
@@ -146,7 +146,7 @@ def main():
         Command(functional_base_cmd + ["/tini/test/reaping/stage_1.py"], fail_cmd).run(timeout=10)
 
         # Signals test
-        for sig, retcode in [("INT", 1), ("TERM", 143)]:
+        for sig, retcode in [("TERM", 143), ("USR1", 138), ("USR2", 140)]:
             Command(
                 functional_base_cmd + ["/tini/test/signals/test.py"],
                 fail_cmd,
@@ -158,6 +158,7 @@ def main():
         Command(functional_base_cmd + ["-z"], fail_cmd).run(retcode=127 if args_disabled else 1)
         Command(functional_base_cmd + ["-h"], fail_cmd).run(retcode=127 if args_disabled else 0)
         Command(functional_base_cmd + ["zzzz"], fail_cmd).run(retcode=127)
+        Command(functional_base_cmd + ["-w"], fail_cmd).run(retcode=127 if args_disabled else 0)
 
     # Valgrind test (we only run this on the dynamic version, because otherwise Valgrind may bring up plenty of errors that are
     # actually from libc)

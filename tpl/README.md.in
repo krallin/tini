@@ -41,6 +41,10 @@ If you'd like more detail on why this is useful, review this issue discussion:
 Using Tini
 ----------
 
+*NOTE: If you are using Docker 1.13 or greater, Tini is included in Docker
+itself. This includes all versions of Docker CE. To enable Tini, just [pass the
+`--init` flag to `docker run`][5].*
+
 *NOTE: There are [pre-built Docker images available for Tini][10]. If
 you're currently using an Ubuntu or CentOS image as your base, you can use
 one of those as a drop-in replacement.*
@@ -84,7 +88,7 @@ your package manager):
     ENV TINI_VERSION v@tini_VERSION_MAJOR@.@tini_VERSION_MINOR@.@tini_VERSION_PATCH@
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
     ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
-    RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
+    RUN gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
      && gpg --verify /tini.asc
 
 
@@ -92,7 +96,7 @@ your package manager):
 
 On Alpine Linux, you can use the following command to install Tini:
 
-    RUN apk add --update tini
+    RUN apk add --no-cache tini
     # Tini is now available at /sbin/tini
     ENTRYPOINT ["/sbin/tini", "--"]
 
@@ -137,10 +141,26 @@ as PID 1.
 and isn't registered as a subreaper. If you don't see a warning, you're fine.*
 
 
+### Remapping exit codes ###
+
+Tini will reuse the child's exit code when exiting, but occasionally, this may
+not be exactly what you want (e.g. if your child exits with 143 after receiving
+SIGTERM). Notably, this can be an issue with Java apps.
+
+In this case, you can use the `-e` flag to remap an arbitrary exit code to 0.
+You can pass the flag multiple times if needed.
+
+For example:
+
+```
+tini -e 143 -- ...
+```
+
+
 ### Process group killing ###
 
 By default, Tini only kills its immediate child process.  This can be
-inconvenient if sending a signal to that process does have the desired
+inconvenient if sending a signal to that process does not have the desired
 effect.  For example, if you do
 
     docker run krallin/ubuntu-tini sh -c 'sleep 10'
@@ -153,6 +173,20 @@ With the `-g` option, Tini kills the child process group , so that
 every process in the group gets the signal. This corresponds more
 closely to what happens when you do ctrl-C etc. in a terminal: The
 signal is sent to the foreground process group.
+
+
+### Parent Death Signal ###
+
+Tini can set its parent death signal, which is the signal Tini should receive
+when *its* parent exits. To set the parent death signal, use the `-p` flag with
+the name of the signal Tini should receive when its parent exits:
+
+```
+tini -p SIGTERM -- ...
+```
+
+*NOTE: See [this PR discussion][12] to learn more about the parent death signal
+and use cases.*
 
 
 More
@@ -237,6 +271,7 @@ Contributors:
   + [David Wragg][31]
   + [Michael Crosby][32]
   + [Wyatt Preul][33]
+  + [Patrick Steinhardt][34]
 
 Special thanks to:
 
@@ -245,12 +280,15 @@ Special thanks to:
 
 
   [0]: https://github.com/krallin/tini/issues/8
+  [5]: https://docs.docker.com/engine/reference/commandline/run/
   [10]: https://github.com/krallin/tini-images
   [11]: https://github.com/krallin/tini/releases
+  [12]: https://github.com/krallin/tini/pull/114
   [20]: https://github.com/krallin/
   [30]: https://github.com/tianon
   [31]: https://github.com/dpw
   [32]: https://github.com/crosbymichael
   [33]: https://github.com/geek
+  [34]: https://github.com/pks-t
   [40]: https://github.com/danilobuerger
   [41]: https://github.com/datakurre
