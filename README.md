@@ -60,7 +60,7 @@ to manually invoke Tini:
 
     # Add Tini
     ENV TINI_VERSION v0.18.0
-    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+    RUN curl https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini -o /tini
     RUN chmod +x /tini
     ENTRYPOINT ["/tini", "--"]
 
@@ -86,8 +86,8 @@ You can verify their signatures using `gpg` (which you may install using
 your package manager):
 
     ENV TINI_VERSION v0.18.0
-    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
-    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
+    RUN curl https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini -o /tini
+    RUN curl https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc -o /tini.asc
     RUN gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
      && gpg --verify /tini.asc
 
@@ -207,7 +207,7 @@ Tini has very few dependencies (it only depends on libc), but if your
 container fails to start, you might want to consider using the statically-built
 version instead:
 
-    ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
+    RUN curl https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static -o /tini
 
 
 ### Size Considerations ###
