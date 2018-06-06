@@ -37,6 +37,7 @@
 #define REDIRECT_STDOUT	"TITUS_REDIRECT_STDOUT"
 #define TITUS_CB_PATH	"TITUS_UNIX_CB_PATH"
 #define TITUS_CONFIRM	"TITUS_CONFIRM"
+#define TITUS_BATCH	"TITUS_BATCH"
 #define TINI_HANDOFF	"TINI_HANDOFF"
 #define TINI_UNSHARE	"TINI_UNSHARE"
 
@@ -202,6 +203,8 @@ int isolate_child() {
 }
 
 int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const signal_configuration_t* const sigconf_ptr) {
+	const struct sched_param param = {0};
+
 	// Restore all signal handlers to the way they were before we touched them.
 	if (restore_signals(sigconf_ptr)) {
 		return 1;
@@ -218,6 +221,12 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 		return 1;
 	}
 
+	if (getenv(TITUS_BATCH)) {
+		if (sched_setscheduler(0, SCHED_BATCH, &param)) {
+			PRINT_WARNING("Unable to set SCHED_BATCH policy: %s", strerror(errno));
+		}
+	}
+
 	// Unset TINI specific environment variables
 	unsetenv(REDIRECT_STDERR);
 	unsetenv(REDIRECT_STDOUT);
@@ -225,6 +234,7 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 	unsetenv(TITUS_CONFIRM);
 	unsetenv(TINI_HANDOFF);
 	unsetenv(TINI_UNSHARE);
+	unsetenv(TITUS_BATCH);
 
 	execvp(argv[0], argv);
 
