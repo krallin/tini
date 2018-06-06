@@ -206,6 +206,8 @@ int isolate_child() {
 
 int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const signal_configuration_t* const sigconf_ptr) {
 	const struct sched_param param = {0};
+	int sched_mode = SCHED_BATCH;
+	const char *titus_batch;
 
 	// Restore all signal handlers to the way they were before we touched them.
 	if (restore_signals(sigconf_ptr)) {
@@ -223,9 +225,12 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 		return 1;
 	}
 
-	if (getenv(TITUS_BATCH)) {
-		if (sched_setscheduler(0, SCHED_BATCH, &param)) {
-			PRINT_WARNING("Unable to set SCHED_BATCH policy: %s", strerror(errno));
+	titus_batch = getenv(TITUS_BATCH);
+	if (titus_batch) {
+		if (strcmp("idle", titus_batch) == 0)
+			sched_mode = SCHED_IDLE;
+		if (sched_setscheduler(0, sched_mode, &param)) {
+			PRINT_WARNING("Unable to set %d policy: %s", sched_mode, strerror(errno));
 		}
 		if (setpriority(PRIO_PROCESS, 0, 19)) {
 			PRINT_WARNING("Unable to set process's niceness to 19: %s", strerror(errno))
