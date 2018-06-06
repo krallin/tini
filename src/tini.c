@@ -20,6 +20,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
@@ -224,6 +226,9 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 	if (getenv(TITUS_BATCH)) {
 		if (sched_setscheduler(0, SCHED_BATCH, &param)) {
 			PRINT_WARNING("Unable to set SCHED_BATCH policy: %s", strerror(errno));
+		}
+		if (setpriority(PRIO_PROCESS, 0, 19)) {
+			PRINT_WARNING("Unable to set process's niceness to 19: %s", strerror(errno))
 		}
 	}
 
