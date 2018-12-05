@@ -188,6 +188,35 @@ tini -p SIGTERM -- ...
 *NOTE: See [this PR discussion][12] to learn more about the parent death signal
 and use cases.*
 
+### Post Processing Commands ###
+
+Tini can be instructed to execute a sequence of commands after the primary
+child terminates. These post processing commands can be used to perform cleanup
+actions, or remap exit codes. To add a post processing command, use the `-P`
+flag. The flag will consume arguments until a lone `;` is encountered. In
+addition, an argument of `{}` will be replaced with the numeric exit code of
+the last process tini ran. The exit code of the post processing command will be
+the new exit code for tini.
+
+```
+$ echo -e '#!/bin/sh\nexit $(expr $1 + 1)' > test.sh
+$ tini -P test.sh {} ; -- /bin/false
+$ exit $?
+2
+```
+
+*NOTE: The `;` terminator may need to be escaped if executed from a shell*
+
+Multiple post processing command may be specified on the command line. Each one
+will be executed in the order listed, and each can be passed the exit code
+from the previous one via `{}`.
+
+Post processing commands inherit their signal mask from tini itself, unlike the
+child command which gets the default signal mask. This makes them suitable for
+unconditionally running uninterruptable commands after the primary command
+exits. The post processing commands can always unmask signals if they desire to
+be interruptable again.
+
 
 More
 ----
