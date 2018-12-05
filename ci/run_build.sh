@@ -144,6 +144,18 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
       if "${tini}" -vvv -- -- true; then
         exit 1
       fi
+
+      echo "Testing ${tini} missing post command terminator (should fail)"
+      # Missing terminator
+      if "$tini" -P true -- true; then
+        exit 1
+      fi
+
+      echo "Testing ${tini} missing post command with only a terminator (should fail)"
+      # Only a terminator
+      if "$tini" -P \; -- true; then
+        exit 1
+      fi
     fi
 
     echo "Testing ${tini} supports TINI_VERBOSITY"

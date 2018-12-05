@@ -62,6 +62,25 @@ def main():
             ret = p.wait()
             assert ret == code, "Exclusive exit code test failed for %s, exit: %s" % (code, ret)
 
+        print "Running post command test for {0}".format(tini)
+        for in_code, out_code in ((0, 2), (1, 3)):
+            p = subprocess.Popen([tini, '-P', os.path.join(src, "test", "post", "stage_1.sh"), '{}', ';', '--', 'sh', '-c', 'exit {0}'.format(in_code)],
+                stdout=DEVNULL, stderr=DEVNULL
+            )
+            ret = p.wait()
+            assert ret == out_code, "post command test failed for %s, exit: %s" % (in_code, ret)
+
+        print "Running post command chain test for {0}".format(tini)
+
+        for in_code, out_code in ((0, 5), (1, 6)):
+            post_cmd_1 = os.path.join(src, "test", "post", "stage_1.sh")
+            post_cmd_2 = os.path.join(src, "test", "post", "stage_2.sh")
+            p = subprocess.Popen([tini, '-P', post_cmd_1, '{}', ';', '-P', post_cmd_2, '{}', ';', '--', 'sh', '-c', 'exit {0}'.format(in_code)],
+                stdout=DEVNULL, stderr=DEVNULL
+            )
+            ret = p.wait()
+            assert ret == out_code, "post command test failed for %s, exit: %s" % (in_code, ret)
+
     tests = [([proxy, tini], {}),]
 
     if subreaper_support:
