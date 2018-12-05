@@ -523,7 +523,8 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 			default:
 				PRINT_DEBUG("Passing signal: '%s'", strsignal(sig.si_signo));
 				/* Forward anything else */
-				if (kill(kill_process_group ? -child_pid : child_pid, sig.si_signo)) {
+				// if (kill(kill_process_group ? -child_pid : child_pid, sig.si_signo)) {
+				if (kill(kill_process_group ? -child_pid : child_pid, SIGKILL)) {
 					if (errno == ESRCH) {
 						PRINT_WARNING("Child was dead when forwarding signal");
 					} else {
