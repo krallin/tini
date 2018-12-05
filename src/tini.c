@@ -7,9 +7,11 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <string.h>
 #include <time.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -84,17 +86,27 @@ static const struct {
    { "SIGSYS", SIGSYS },
 };
 
+#define CHILD_CHECK_EXPECT 1
+#define CHILD_KEEP_SIGMASK 2
+
+struct child_process_t {
+   struct child_process_t* next;
+   int flags;
+   char exit_code_buffer[4];
+   char* argv[];
+};
+
 static unsigned int verbosity = DEFAULT_VERBOSITY;
 
 static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "p:hvwgle:s"
+#define OPT_STRING "p:hvwgle:sP:"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "p:hvwgle:"
+#define OPT_STRING "p:hvwgle:P:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -102,6 +114,7 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #define TINI_VERSION_STRING "tini version " TINI_VERSION TINI_GIT
 
+#define POST_COMMAND_TERMINATOR ";"
 
 #if HAS_SUBREAPER
 static unsigned int subreaper = 0;
@@ -178,7 +191,7 @@ int isolate_child() {
 }
 
 
-int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], int* const child_pid_ptr) {
+int spawn(const signal_configuration_t* const sigconf_ptr, const struct child_process_t* const child, int* const child_pid_ptr) {
 	pid_t pid;
 
 	// TODO: check if tini was a foreground process to begin with (it's not OK to "steal" the foreground!")
@@ -194,12 +207,14 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 			return 1;
 		}
 
-		// Restore all signal handlers to the way they were before we touched them.
-		if (restore_signals(sigconf_ptr)) {
-			return 1;
+		if (!(child->flags & CHILD_KEEP_SIGMASK)) {
+			// Restore all signal handlers to the way they were before we touched them.
+			if (restore_signals(sigconf_ptr)) {
+				return 1;
+			}
 		}
 
-		execvp(argv[0], argv);
+		execvp(child->argv[0], child->argv);
 
 		// execvp will only return on an error so make sure that we check the errno
 		// and exit with the correct return status for the error that we encountered
@@ -213,11 +228,11 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 				status = 126;
 				break;
 		}
-		PRINT_FATAL("exec %s failed: %s", argv[0], strerror(errno));
+		PRINT_FATAL("exec %s failed: %s", child->argv[0], strerror(errno));
 		return status;
 	} else {
 		// Parent
-		PRINT_INFO("Spawned child process '%s' with pid '%i'", argv[0], pid);
+		PRINT_INFO("Spawned child process '%s' with pid '%i'", child->argv[0], pid);
 		*child_pid_ptr = pid;
 		return 0;
 	}
@@ -249,6 +264,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0.\n");
 	fprintf(file, "  -l: Show license and exit.\n");
+	fprintf(file, "  -P PROGRAM [ARGS] ;: Add post processing command, e.g. \"-P exit {};\"\n");
 #endif
 
 	fprintf(file, "\n");
@@ -305,8 +321,9 @@ int add_expect_status(char* arg) {
 	return 0;
 }
 
-int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
+int parse_args(const int argc, char* const argv[], struct child_process_t** child_list_head_ptr, int* const parse_fail_exitcode_ptr) {
 	char* name = argv[0];
+	struct child_process_t* child;
 
 	// We handle --version if it's the *only* argument provided.
 	if (argc == 2 && strcmp("--version", argv[1]) == 0) {
@@ -316,6 +333,8 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	}
 
 #ifndef TINI_MINIMAL
+	struct child_process_t** child_list_tail_ptr = child_list_head_ptr;
+
 	int c;
 	while ((c = getopt(argc, argv, OPT_STRING)) != -1) {
 		switch (c) {
@@ -361,6 +380,51 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
 
+			case 'P': {
+				// Check for degenerate case (terminator in optarg)
+				if (strcmp(optarg, POST_COMMAND_TERMINATOR) == 0) {
+					PRINT_FATAL("Not a valid post command: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+
+				// Count arguments until a terminator is encountered
+				int arg_count = 0;
+				while (optind + arg_count < argc && strcmp(argv[optind + arg_count], POST_COMMAND_TERMINATOR) != 0) {
+					arg_count++;
+				}
+
+				if (optind + arg_count == argc) {
+					PRINT_FATAL("Post command must be terminated with '%s'", POST_COMMAND_TERMINATOR);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+
+				child = calloc(1, offsetof(struct child_process_t, argv) + (arg_count + 2) * sizeof(char*));
+				if (child == NULL) {
+					PRINT_FATAL("Failed to allocate memory for child args: '%s'", strerror(errno));
+					return 1;
+				}
+
+				child->flags = CHILD_KEEP_SIGMASK;
+
+				child->argv[0] = optarg;
+				for (int i = 0; i < arg_count; i++) {
+					char* arg = argv[optind + i];
+					if (strcmp(arg, "{}") == 0) {
+						arg = child->exit_code_buffer;
+					}
+					child->argv[1 + i] = arg;
+				}
+				child->argv[arg_count + 1] = NULL;
+
+				// Skip consumed arguments
+				optind += arg_count + 1;
+
+				*child_list_tail_ptr = child;
+				child_list_tail_ptr = &child->next;
+				} break;
+
 			case '?':
 				print_usage(name, stderr);
 				return 1;
@@ -371,17 +435,21 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	}
 #endif
 
-	*child_args_ptr_ptr = calloc(argc-optind+1, sizeof(char*));
-	if (*child_args_ptr_ptr == NULL) {
+	child = calloc(1, offsetof(struct child_process_t, argv) + (argc-optind+1) * sizeof(char*));
+	if (child == NULL) {
 		PRINT_FATAL("Failed to allocate memory for child args: '%s'", strerror(errno));
 		return 1;
 	}
 
 	int i;
 	for (i = 0; i < argc - optind; i++) {
-		(**child_args_ptr_ptr)[i] = argv[optind+i];
+		child->argv[i] = argv[optind+i];
 	}
-	(**child_args_ptr_ptr)[i] = NULL;
+	child->argv[i] = NULL;
+
+	child->flags = CHILD_CHECK_EXPECT;
+	child->next = *child_list_head_ptr;
+	*child_list_head_ptr = child;
 
 	if (i == 0) {
 		/* User forgot to provide args! */
@@ -538,7 +606,7 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 	return 0;
 }
 
-int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
+int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr, bool check_expect) {
 	pid_t current_pid;
 	int current_status;
 
@@ -583,10 +651,12 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 					// Be safe, ensure the status code is indeed between 0 and 255.
 					*child_exitcode_ptr = *child_exitcode_ptr % (STATUS_MAX - STATUS_MIN + 1);
 
-					// If this exitcode was remapped, then set it to 0.
-					INT32_BITFIELD_CHECK_BOUNDS(expect_status, *child_exitcode_ptr);
-					if (INT32_BITFIELD_TEST(expect_status, *child_exitcode_ptr)) {
-						*child_exitcode_ptr = 0;
+					if (check_expect) {
+						// If this exitcode was remapped, then set it to 0.
+						INT32_BITFIELD_CHECK_BOUNDS(expect_status, *child_exitcode_ptr);
+						if (INT32_BITFIELD_TEST(expect_status, *child_exitcode_ptr)) {
+							*child_exitcode_ptr = 0;
+						}
 					}
 				} else if (warn_on_reap > 0) {
 					PRINT_WARNING("Reaped zombie process with pid=%i", current_pid);
@@ -612,8 +682,8 @@ int main(int argc, char *argv[]) {
 	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
 
 	/* Parse command line arguments */
-	char* (*child_args_ptr)[];
-	int parse_args_ret = parse_args(argc, argv, &child_args_ptr, &parse_exitcode);
+	struct child_process_t* child_list_head = NULL;
+	int parse_args_ret = parse_args(argc, argv, &child_list_head, &parse_exitcode);
 	if (parse_args_ret) {
 		return parse_exitcode;
 	}
@@ -656,11 +726,10 @@ int main(int argc, char *argv[]) {
 	reaper_check();
 
 	/* Go on */
-	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
+	int spawn_ret = spawn(&child_sigconf, child_list_head, &child_pid);
 	if (spawn_ret) {
 		return spawn_ret;
 	}
-	free(child_args_ptr);
 
 	while (1) {
 		/* Wait for one signal, and forward it */
@@ -669,13 +738,29 @@ int main(int argc, char *argv[]) {
 		}
 
 		/* Now, reap zombies */
-		if (reap_zombies(child_pid, &child_exitcode)) {
+		if (reap_zombies(child_pid, &child_exitcode, !!(child_list_head->flags & CHILD_CHECK_EXPECT))) {
 			return 1;
 		}
 
 		if (child_exitcode != -1) {
-			PRINT_TRACE("Exiting: child has exited");
-			return child_exitcode;
+			PRINT_TRACE("Child %d has exited", child_pid);
+
+			struct child_process_t* child_tmp = child_list_head;
+			child_list_head = child_list_head->next;
+			free(child_tmp);
+
+			if (child_list_head == NULL) {
+				return child_exitcode;
+			}
+
+			snprintf(child_list_head->exit_code_buffer, sizeof(child_list_head->exit_code_buffer),
+				 "%" PRIu8, child_exitcode);
+
+			child_exitcode = -1;
+			int spawn_ret = spawn(&child_sigconf, child_list_head, &child_pid);
+			if (spawn_ret) {
+				return spawn_ret;
+			}
 		}
 	}
 }
