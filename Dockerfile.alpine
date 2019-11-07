@@ -1,0 +1,13 @@
+FROM alpine:3.7
+
+RUN apk add --no-cache bash vim alpine-sdk cmake
+
+ADD . /build
+WORKDIR /build
+
+RUN cmake .
+RUN make
+
+RUN gcc leak.c -o leak
+
+CMD ["./tini", "-v", "-v", "-v", "-k", "./leak"]

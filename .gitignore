@@ -1,3 +1,11 @@
 dist
 sign.key
 .env
+CMakeFiles
+
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+VERSION
+cmake_install.cmake
+tiniConfig.h

@@ -90,11 +90,11 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "p:hvwgle:s"
+#define OPT_STRING "p:hvwkgle:s"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "p:hvwgle:"
+#define OPT_STRING "p:hvwkgle:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -110,8 +110,11 @@ static unsigned int parent_death_signal = 0;
 static unsigned int kill_process_group = 0;
 
 static unsigned int warn_on_reap = 0;
+static unsigned int oom_killer_enabled = 0;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
+static const char USAGE_IN_BYTES_SYS[] = "/sys/fs/cgroup/memory/memory.usage_in_bytes";
+static const char LIMIT_IN_BYTES_SYS[] = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 
 static const char reaper_warning[] = "Tini is not running as PID 1 "
 #if HAS_SUBREAPER
@@ -249,7 +252,9 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0.\n");
 	fprintf(file, "  -l: Show license and exit.\n");
+	fprintf(file, "  -k: Enable OOM killer\n");
 #endif
+
 
 	fprintf(file, "\n");
 
@@ -338,6 +343,10 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 
 			case 'v':
 				verbosity++;
+				break;
+
+			case 'k':
+				oom_killer_enabled++;
 				break;
 
 			case 'w':
@@ -603,6 +612,53 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 	return 0;
 }
 
+int read_memory_stats(const char* path, long* bytes) {
+	FILE *stats_file;
+
+	stats_file = fopen(path, "r");
+	if (!stats_file) {
+		return 1;
+	}
+
+	fscanf(stats_file, "%ld", bytes);
+	fclose(stats_file);
+
+	return 0;
+}
+
+int check_for_oom(int* const child_exitcode_ptr, pid_t const child_pid) {
+	if (oom_killer_enabled == 0) {
+		return 0;
+	}
+
+	long limit_in_bytes, usage_in_bytes;
+	int err;
+	err = read_memory_stats(LIMIT_IN_BYTES_SYS, &limit_in_bytes);
+	if (err != 0) {
+		PRINT_WARNING("[OOM KILLER] Failed to read memory.limit_in_bytes");
+		return 0;
+	}
+
+	read_memory_stats(USAGE_IN_BYTES_SYS, &usage_in_bytes);
+	if (err != 0) {
+		PRINT_WARNING("[OOM KILLER] Failed to read memory.usage_in_bytes");
+		return 0;
+	}
+
+	PRINT_DEBUG("[OOM KILLER] memory.usage_in_bytes: %ld", usage_in_bytes);
+	PRINT_DEBUG("[OOM KILLER] memory.limit_in_bytes: %ld", limit_in_bytes);
+
+	*child_exitcode_ptr = -1;
+
+	int prct_exhausted = ((limit_in_bytes - usage_in_bytes) * 100)/limit_in_bytes;
+	if (prct_exhausted < 10) {
+		PRINT_FATAL("[OOM KILLER] memory usage is beyond the configured buffer, sending SIGINT.");
+		kill(kill_process_group ? -child_pid : child_pid, SIGINT);
+		return 1;
+	}
+
+	return 0;
+}
 
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
@@ -666,6 +722,10 @@ int main(int argc, char *argv[]) {
 		/* Wait for one signal, and forward it */
 		if (wait_and_forward_signal(&parent_sigset, child_pid)) {
 			return 1;
+		}
+
+		if (check_for_oom(&child_exitcode, child_pid)) {
+			return 1; // and set exit_code?
 		}
 
 		/* Now, reap zombies */
