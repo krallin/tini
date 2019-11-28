@@ -122,9 +122,9 @@ Zombie processes will not be re-parented to Tini, so zombie reaping won't work.\
 To fix the problem, "
 #if HAS_SUBREAPER
 #ifndef TINI_MINIMAL
-"use the -s option "
+"use the -s option or "
 #endif
-"or set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
+"set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
 #endif
 "run Tini as PID 1.";
 
