@@ -90,11 +90,11 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "p:hvwgle:s"
+#define OPT_STRING "p:hvwgle:R:s"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "p:hvwgle:"
+#define OPT_STRING "p:hvwgle:R:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -110,6 +110,8 @@ static unsigned int parent_death_signal = 0;
 static unsigned int kill_process_group = 0;
 
 static unsigned int warn_on_reap = 0;
+
+enum respawn_enum { Never, Always, OnFailure } respawn_type = Never;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
@@ -248,6 +250,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -w: Print a warning when processes are getting reaped.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0 (can be repeated).\n");
+	fprintf(file, "  -R {A|F}: Respawn [A]lways or On-[F]ailure.\n");
 	fprintf(file, "  -l: Show license and exit.\n");
 #endif
 
@@ -285,6 +288,20 @@ int set_pdeathsig(char* const arg) {
 	}
 
 	return 1;
+}
+
+int set_respawn(char* const arg) {
+	if (strlen(arg) != 1) {
+		return 1;
+	} else if (arg[0] == 'A') {
+		respawn_type = Always;
+	} else if (arg[0] == 'F') {
+		respawn_type = OnFailure;
+	} else {
+		return 1;
+	}
+
+	return 0;
 }
 
 int add_expect_status(char* arg) {
@@ -360,6 +377,14 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				print_license(stdout);
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
+
+			case 'R':
+				if (set_respawn(optarg)) {
+					PRINT_FATAL("Not a valid option for -R: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+				break;
 
 			case '?':
 				print_usage(name, stderr);
@@ -573,8 +598,13 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 						/* Our process was terminated. Emulate what sh / bash
 						 * would do, which is to return 128 + signal number.
 						 */
-						PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(WTERMSIG(current_status)));
-						*child_exitcode_ptr = 128 + WTERMSIG(current_status);
+						unsigned int signum = WTERMSIG(current_status);
+						PRINT_INFO("Main child exited with signal (with signal '%s')", strsignal(signum));
+						if (parent_death_signal > 0 && parent_death_signal == signum && respawn_type != Never) {
+							PRINT_DEBUG("Disabling respawns");
+							respawn_type = Never;
+						}
+						*child_exitcode_ptr = 128 + signum;
 					} else {
 						PRINT_FATAL("Main child exited for unknown reason");
 						return 1;
@@ -655,26 +685,49 @@ int main(int argc, char *argv[]) {
 	/* Are we going to reap zombies properly? If not, warn. */
 	reaper_check();
 
+lab_respawn:
+	child_exitcode = -1;
+
 	/* Go on */
 	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
 	if (spawn_ret) {
 		return spawn_ret;
 	}
-	free(child_args_ptr);
 
 	while (1) {
 		/* Wait for one signal, and forward it */
 		if (wait_and_forward_signal(&parent_sigset, child_pid)) {
+			free(child_args_ptr);
 			return 1;
 		}
 
 		/* Now, reap zombies */
 		if (reap_zombies(child_pid, &child_exitcode)) {
+			free(child_args_ptr);
 			return 1;
 		}
 
 		if (child_exitcode != -1) {
+			switch (respawn_type) {
+
+				case Always:
+					PRINT_INFO("Child pid=%i has exited (respawning)", child_pid);
+					sleep(1);
+					goto lab_respawn;
+
+				case OnFailure:
+					if (child_exitcode != 0) {
+						PRINT_INFO("Child pid=%i has exited with %i (respawning)", child_pid, child_exitcode);
+						sleep(1);
+						goto lab_respawn;
+					}
+					// fall through ...
+				case Never:
+					; /* nop */
+			}
+
 			PRINT_TRACE("Exiting: child has exited");
+			free(child_args_ptr);
 			return child_exitcode;
 		}
 	}
