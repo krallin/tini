@@ -211,12 +211,7 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
   # Run tests
   python3 "${SOURCE_DIR}/test/run_inner_tests.py"
 else
-  if [[ ! -n "${ARCH_SUFFIX-}" ]]; then
-    echo "Built cross package, but $ARCH_SUFFIX is empty!"
-    exit 1
-  fi
-  echo "Built cross package (ARCH_SUFFIX=${ARCH_SUFFIX})"
-  echo "Skipping smoke and internal tests"
+  echo "Not a native build, skipping smoke and internal tests"
 fi
 
 # Now, copy over files to DIST_DIR, with appropriate names depending on the
@@ -224,42 +219,42 @@ fi
 # Handle the DEB / RPM
 mkdir -p "${DIST_DIR}"
 
-TINIS=()
+DIST_TINIS=()
 
-for tini in tini tini-static; do
-  if [[ -n "${ARCH_SUFFIX-}" ]]; then
-    to="${DIST_DIR}/${tini}-${ARCH_SUFFIX}"
-    TINIS+=("$to")
-    cp "${BUILD_DIR}/${tini}" "$to"
-  else
-    to="${DIST_DIR}/${tini}"
-    TINIS+=("$to")
-    cp "${BUILD_DIR}/${tini}" "$to"
-  fi
+SUFFIX=""
+if [[ -n "$ARCH_SUFFIX" ]]; then
+  SUFFIX="-${ARCH_SUFFIX}"
+elif [[ -z "$ARCH_NATIVE" ]]; then
+  echo "Refusing to publish a non-native build without suffix!"
+  exit 1
+fi
+
+for build_tini in tini tini-static; do
+  dist_tini="${build_tini}${SUFFIX}"
+  cp "${BUILD_DIR}/${build_tini}" "${DIST_DIR}/${dist_tini}"
+  DIST_TINIS+=("$dist_tini")
 done
 
 if [[ -n "${ARCH_NATIVE-}" ]]; then
   for pkg_format in deb rpm; do
-    src="${BUILD_DIR}/tini_${pkg_version}.${pkg_format}"
-
-    if [[ -n "${ARCH_SUFFIX-}" ]]; then
-      to="${DIST_DIR}/tini_${pkg_version}-${ARCH_SUFFIX}.${pkg_format}"
-      TINIS+=("$to")
-      cp "$src" "$to"
-    else
-      to="${DIST_DIR}/tini_${pkg_version}.${pkg_format}"
-      TINIS+=("$to")
-      cp "$src" "$to"
-    fi
+    build_tini="tini_${pkg_version}.${pkg_format}"
+    dist_tini="tini_${pkg_version}${SUFFIX}.${pkg_format}"
+    cp "${BUILD_DIR}/${build_tini}" "${DIST_DIR}/${dist_tini}"
+    DIST_TINIS+=("$dist_tini")
   done
 fi
 
-echo "Tinis: ${TINIS[*]}"
+echo "Tinis: ${DIST_TINIS[*]}"
 
-for tini in "${TINIS[@]}"; do
+pushd "$DIST_DIR"
+
+for tini in "${DIST_TINIS[@]}"; do
   echo "${tini}:"
-  sha1sum "$tini"
-  sha256sum "$tini"
+
+  for sum in sha1sum sha256sum; do
+    "$sum" "$tini" | tee "${tini}.${sum}"
+  done
+
   file "$tini"
   echo "--"
 done
@@ -279,8 +274,10 @@ if [[ -n "$GPG_PASSPHRASE" ]] && [[ -f "${SOURCE_DIR}/sign.key" ]]; then
   gpg --homedir "${GPG_SIGN_HOMEDIR}" --import "${SOURCE_DIR}/sign.key"
   gpg --homedir "${GPG_VERIFY_HOMEDIR}" --keyserver "$PGP_KEYSERVER" --recv-keys "$PGP_KEY_FINGERPRINT"
 
-  for tini in "${TINIS[@]}"; do
+  for tini in "${DIST_TINIS[@]}"; do
     echo "${GPG_PASSPHRASE}" | gpg --homedir "${GPG_SIGN_HOMEDIR}" --passphrase-fd 0 --armor --detach-sign "${tini}"
     gpg --homedir "${GPG_VERIFY_HOMEDIR}" --verify "${tini}.asc"
   done
 fi
+
+popd
