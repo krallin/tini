@@ -15,7 +15,9 @@ env:
     - ARCH_SUFFIX=i386 CFLAGS="-m32" ARCH_NATIVE= MINIMAL=
     - ARCH_SUFFIX=muslc-amd64 CC=musl-gcc ARCH_NATIVE=1 MINIMAL=
     - ARCH_SUFFIX=ppc64el CC=powerpc64le-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=ppc64le CC=powerpc64le-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
     - ARCH_SUFFIX=s390x CC=s390x-linux-gnu-gcc ARCH_NATIVE= MINIMAL=
+    - ARCH_SUFFIX=mips64el CC=mips64el-linux-gnuabi64-gcc-5 ARCH_NATIVE= MINIMAL=
   global:
     - secure: "RKF9Z9gLxp6k/xITqn7ma1E9HfpYcDXuJFf4862WeH9EMnK9lDq+TWnGsQfkIlqh8h9goe7U+BvRiTibj9MiD5u7eluLo3dlwsLxPpYtyswYeLeC1wKKdT5LPGAXbRKomvBalRYMI+dDnGIM4w96mHgGGvx2zZXGkiAQhm6fJ3k="
     - DIST_DIR="${PWD}/dist"
@@ -24,7 +26,7 @@ before_install:
   - openssl aes-256-cbc -K $encrypted_2893fd5649e7_key -iv $encrypted_2893fd5649e7_iv -in sign.key.enc -out sign.key -d || echo "Encrypted signing key unavailable"
 
 script:
-  - ./ddist.sh "$ARCH_SUFFIX"
+  - ./ddist.sh
   - ls -lah "$DIST_DIR"
   - git diff --exit-code
 
