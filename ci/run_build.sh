@@ -206,10 +206,10 @@ if [[ -n "${ARCH_NATIVE-}" ]]; then
   export CFLAGS  # We need them to build our test suite, regardless of FORCE_SUBREAPER
 
   # Install test dependencies
-  CC=gcc pip install psutil python-prctl bitmap
+  CC=gcc python3 -m pip install psutil python-prctl bitmap
 
   # Run tests
-  python "${SOURCE_DIR}/test/run_inner_tests.py"
+  python3 "${SOURCE_DIR}/test/run_inner_tests.py"
 else
   if [[ ! -n "${ARCH_SUFFIX-}" ]]; then
     echo "Built cross package, but $ARCH_SUFFIX is empty!"
