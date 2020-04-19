@@ -16,7 +16,7 @@ case "${ARCH_SUFFIX-}" in
   armhf) DEPS+=(gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross) ;;
   i386) DEPS+=(libc6-dev-i386  gcc-multilib) ;;
   muslc-amd64) DEPS+=(musl-tools) ;;
-  ppc64el) DEPS+=(gcc-powerpc64le-linux-gnu binutils-powerpc64le-linux-gnu libc6-dev-ppc64el-cross) ;;
+  ppc64el|ppc64le) DEPS+=(gcc-powerpc64le-linux-gnu binutils-powerpc64le-linux-gnu libc6-dev-ppc64el-cross) ;;
   s390x) DEPS+=(gcc-s390x-linux-gnu binutils-s390x-linux-gnu libc6-dev-s390x-cross) ;;
   mips64el) DEPS+=(gcc-5-mips64el-linux-gnuabi64 binutils-mips64el-linux-gnuabi64 libc6-dev-mips64el-cross) ;;
   *) echo "Unknown ARCH_SUFFIX=${ARCH_SUFFIX-}"; exit 1 ;;
