@@ -92,6 +92,19 @@ your package manager):
      && gpg --batch --verify /tini.asc /tini
 
 
+### Verifying binaries via checksum ###
+
+The `tini` and `tini-static` binaries have generated checksums (`SHA1` and `SHA256`).
+
+You can verify their checksums using `sha1sum` and `sha256sum` (which you may install using
+your package manager):
+
+    ENV TINI_VERSION v0.19.0
+    RUN wget --no-check-certificate --no-cookies --quiet https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-amd64 \
+        && wget --no-check-certificate --no-cookies --quiet https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-amd64.sha256sum \
+        && echo "$(cat tini-amd64.sha256sum)" | sha256sum -c
+
+
 ### Alpine Linux Package ###
 
 On Alpine Linux, you can use the following command to install Tini:
