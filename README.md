@@ -107,6 +107,14 @@ Using Nix, you can use the following command to install Tini:
 
     nix-env --install tini
 
+### Debian ###
+
+On Debian (Buster or newer), you can use the following command to install Tini:
+
+    apt-get install tini
+
+Note that this installs `/usr/bin/tini` (and `/usr/bin/tini-static`), not `/tini`.
+
 ### Other Platforms ###
 
 ARM and 32-bit binaries are available! You can find the complete list of
