@@ -1,3 +1,16 @@
 dist
 sign.key
 .env
+
+
+CMakeCache.txt
+CMakeFiles/
+CPackConfig.cmake
+CPackSourceConfig.cmake
+VERSION
+cmake_install.cmake
+run_seccomp_test.sh
+tiniConfig.h
+Makefile
+tini
+tini-static
