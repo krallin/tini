@@ -28,6 +28,7 @@
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
+#include "seccomp_fd_notify.h"
 
 #ifndef CLONE_NEWCGROUP
 #define CLONE_NEWCGROUP		0x02000000	/* New cgroup namespace */
@@ -241,6 +242,7 @@ int do_execvp(char* const argv[], int new_stdout_fd, int new_stderr_fd, const si
 	unsetenv(REDIRECT_STDERR);
 	unsetenv(REDIRECT_STDOUT);
 	unsetenv(TITUS_CB_PATH);
+	unsetenv(TITUS_SECCOMP_NOTIFY_SOCK_PATH);
 	unsetenv(TITUS_CONFIRM);
 	unsetenv(TINI_HANDOFF);
 	unsetenv(TINI_UNSHARE);
@@ -844,6 +846,9 @@ int main(int argc, char *argv[]) {
 
 	/* Maybe pass our pid to the pid sock */
 	maybe_unix_cb();
+
+	/* Setup a seccomp notification fd and pass it off, if available */
+	maybe_setup_seccomp_notifer();
 
 	/* Go on */
 	int spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
