@@ -6,9 +6,12 @@
 
 #include <linux/audit.h>
 #include <linux/seccomp.h>
+#include <linux/limits.h>
 #include <linux/filter.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <stddef.h>
+#include <fcntl.h>
 
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -19,25 +22,34 @@
 #define PRINT_WARNING(...)  { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 #define PRINT_INFO(...)  { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
 
-static int send_fd(int sock, int fd)
+static int send_fds(int sock, int *fds_to_send, int num_fds)
 {
 	struct msghdr msg = {0};
-	struct cmsghdr *cmsg;
-	char buf[CMSG_SPACE(sizeof(int))] = {0}, c = 'c';
-	struct iovec io = {
-		.iov_base = &c,
-		.iov_len = 1,
-	};
+	struct cmsghdr *cmsg = NULL;
+	memset(&msg, 0, sizeof(msg));
 
-	msg.msg_iov = &io;
+	size_t cmsgbufsize = CMSG_SPACE(num_fds * sizeof(int));
+	char *cmsgbuf = NULL;
+	cmsgbuf = malloc(cmsgbufsize);
+
+	struct iovec iov;
+	char buf[1] = {0};
+	memset(&iov, 0, sizeof(iov));
+	iov.iov_base = buf;
+	iov.iov_len = sizeof(buf);
+
+	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-	msg.msg_control = buf;
-	msg.msg_controllen = sizeof(buf);
+	msg.msg_control = cmsgbuf;
+	msg.msg_controllen = cmsgbufsize;
+
 	cmsg = CMSG_FIRSTHDR(&msg);
 	cmsg->cmsg_level = SOL_SOCKET;
 	cmsg->cmsg_type = SCM_RIGHTS;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-	*((int *)CMSG_DATA(cmsg)) = fd;
+	cmsg->cmsg_len = CMSG_LEN(num_fds * sizeof(int));
+
+	memcpy(CMSG_DATA(cmsg), fds_to_send, num_fds * sizeof(int));
+
 	msg.msg_controllen = cmsg->cmsg_len;
 
 	int sendmsg_return = sendmsg(sock, &msg, 0);
@@ -103,14 +115,28 @@ static int install_notify_filter(void) {
 	return notify_fd;
 }
 
+int get_mem_fd(int pid) {
+	char mem_path[PATH_MAX];
+	snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", pid);
+	int mem_fd = open(mem_path, O_RDWR | O_CLOEXEC);
+	return mem_fd;
+}
+
+int get_pid_fd(int pid) {
+	char pid_path[PATH_MAX];
+	snprintf(pid_path, sizeof(pid_path), "/proc/%d", pid);
+	int pid_fd = open(pid_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	return pid_fd;
+}
+
 void maybe_setup_seccomp_notifer() {
 	char *socket_path;
 	socket_path = getenv(TITUS_SECCOMP_NOTIFY_SOCK_PATH);
 	if (socket_path) {
 
-		int sockfd = -1;
-		sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
-		if (sockfd == -1) {
+		int sock_fd = -1;
+		sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (sock_fd == -1) {
 			PRINT_WARNING("Unable to open unix socket for seccomp handoff: %s", strerror(errno));
 			return;
 		}
@@ -118,7 +144,7 @@ void maybe_setup_seccomp_notifer() {
 		struct sockaddr_un addr = {0};
 		addr.sun_family = AF_UNIX;
 		strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
-		if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+		if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
 			PRINT_WARNING("Unable to connect on unix socket (%s) for seccomp handoff: %s", socket_path, strerror(errno));
 			return;
 		}
@@ -128,10 +154,19 @@ void maybe_setup_seccomp_notifer() {
 			return;
 		}
 
-		int notifyFd = -1;
-		notifyFd = install_notify_filter();
-		if (send_fd(sockfd, notifyFd) == -1) {
-			PRINT_WARNING("Couldn't send fd to the socket at %s: %s", socket_path, strerror(errno));
+		int pid = getpid();
+		int notify_fd, pid_fd, mem_fd = -1;
+		notify_fd = install_notify_filter();
+		pid_fd = get_pid_fd(pid);
+		mem_fd = get_mem_fd(pid);
+
+		int send_fd_list[3];
+		send_fd_list[0] = pid_fd;
+		send_fd_list[1] = mem_fd;
+		send_fd_list[2] = notify_fd;
+
+		if (send_fds(sock_fd, send_fd_list, 3) == -1) {
+			PRINT_WARNING("Couldn't send fds to the socket at %s: %s", socket_path, strerror(errno));
 			return;
 		}
 	}
