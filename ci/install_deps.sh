@@ -10,7 +10,7 @@ DEPS=(
 )
 
 case "${ARCH_SUFFIX-}" in
-  amd64|'') ;;
+  amd64|x86_64|'') ;;
   arm64) DEPS+=(gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libc6-dev-arm64-cross) ;;
   armel) DEPS+=(gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi libc6-dev-armel-cross) ;;
   armhf) DEPS+=(gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross) ;;
