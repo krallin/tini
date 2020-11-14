@@ -247,7 +247,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -v: Generate more verbose output. Repeat up to 3 times.\n");
 	fprintf(file, "  -w: Print a warning when processes are getting reaped.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
-	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0.\n");
+	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0 (can be repeated).\n");
 	fprintf(file, "  -l: Show license and exit.\n");
 #endif
 
