@@ -140,6 +140,13 @@ or use an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers):
     pacaur -S tini
 
 
+### openSUSE ###
+
+On openSUSE tini is available in [Virtualization:containers/tini](https://build.opensuse.org/package/show/Virtualization:containers/tini).
+Install it with:
+
+    zypper in tini
+
 ### Other Platforms ###
 
 ARM and 32-bit binaries are available! You can find the complete list of
