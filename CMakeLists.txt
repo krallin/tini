@@ -78,10 +78,12 @@ configure_file (
 
 
 include_directories ("${PROJECT_BINARY_DIR}")
-
+find_package (Threads REQUIRED)
 add_executable (tini src/tini.c src/seccomp_fd_notify.c)
 
 add_executable (tini-static src/tini.c src/seccomp_fd_notify.c)
+TARGET_LINK_LIBRARIES (tini  ${CMAKE_THREAD_LIBS_INIT} )
+TARGET_LINK_LIBRARIES (tini-static  ${CMAKE_THREAD_LIBS_INIT} )
 set_target_properties (tini-static PROPERTIES LINK_FLAGS "-Wl,--no-export-dynamic -static")
 
 # Installation
