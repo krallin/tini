@@ -13,6 +13,8 @@ ARG CC
 
 # Persist ARGs into the image
 
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
 ENV ARCH_SUFFIX="$ARCH_SUFFIX" \
     ARCH_NATIVE="$ARCH_NATIVE" \
     CC="$CC"

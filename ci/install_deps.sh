@@ -6,7 +6,7 @@ set -o xtrace
 DEPS=(
   build-essential git gdb valgrind cmake rpm file
   libcap-dev python3-dev python3-pip python3-setuptools
-  hardening-includes gnupg
+  hardening-includes gnupg curl
 )
 
 case "${ARCH_SUFFIX-}" in
@@ -26,5 +26,7 @@ apt-get update
 apt-get install --no-install-recommends --yes "${DEPS[@]}"
 rm -rf /var/lib/apt/lists/*
 
-python3 -m pip install --upgrade pip
+curl -fsSL -o- https://bootstrap.pypa.io/pip/3.5/get-pip.py | python3.5
+#python3 -m pip install --upgrade pip
 python3 -m pip install virtualenv
+python3 -m pip install importlib-metadata==2.1.0
