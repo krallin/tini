@@ -2,6 +2,7 @@
 import signal
 import os
 import sys
+import time
 
 
 def sigterm_handler(sig, frame):
@@ -20,7 +21,7 @@ def main():
     print("#")
     print("Starting")
     while True:
-        os.system("sleep 1")
+        time.sleep(1)
 
 
 if __name__ == "__main__":
