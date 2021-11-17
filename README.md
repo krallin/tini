@@ -196,7 +196,7 @@ By default, Tini only kills its immediate child process.  This can be
 inconvenient if sending a signal to that process does not have the desired
 effect.  For example, if you do
 
-    docker run krallin/ubuntu-tini sh -c 'sleep 10'
+    docker run --rm krallin/ubuntu-tini sh -c 'sleep 10'
 
 and ctrl-C it, nothing happens: SIGINT is sent to the 'sh' process,
 but that shell won't react to it while it is waiting for the 'sleep'
@@ -207,6 +207,7 @@ every process in the group gets the signal. This corresponds more
 closely to what happens when you do ctrl-C etc. in a terminal: The
 signal is sent to the foreground process group.
 
+    docker run --rm --entrypoint tini krallin/ubuntu-tini -g -- sh -c 'sleep 10'
 
 ### Parent Death Signal ###
 
