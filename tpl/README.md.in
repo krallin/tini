@@ -222,6 +222,24 @@ tini -p SIGTERM -- ...
 and use cases.*
 
 
+### System reboot on exit ###
+
+Instead of merely exiting when the child process exists, Tini can invoke
+`reboot(2)` to bring the system down when it would exit. When running as the
+true PID 1 of a kernel, this prevents a kernel panic that occurs when init
+exits. Use the `-R` option to enable this behavior.
+
+This option allows Tini to function as the init process in a VM, for example,
+in [firecracker](https://github.com/firecracker-microvm/firecracker).
+
+Additionally, Tini can invoke `sync(2)` before reboot. The `-S` option enables
+this extra behavior. If `-S` is specified without `-R` it is ignored.
+
+```
+tini -R -S -- ...
+```
+
+
 More
 ----
 
