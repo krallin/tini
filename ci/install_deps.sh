@@ -6,7 +6,7 @@ set -o xtrace
 DEPS=(
   build-essential git gdb valgrind cmake rpm file
   libcap-dev python3-dev python3-pip python3-setuptools
-  hardening-includes gnupg
+  devscripts gnupg
 )
 
 case "${ARCH_SUFFIX-}" in
