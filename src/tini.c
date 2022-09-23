@@ -147,7 +147,7 @@ int restore_signals(const signal_configuration_t* const sigconf_ptr) {
 	return 0;
 }
 
-int isolate_child() {
+int isolate_child(void) {
 	// Put the child into a new process group.
 	if (setpgid(0, 0) < 0) {
 		PRINT_FATAL("setpgid failed: %s", strerror(errno));
@@ -392,7 +392,7 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 	return 0;
 }
 
-int parse_env() {
+int parse_env(void) {
 #if HAS_SUBREAPER
 	if (getenv(SUBREAPER_ENV_VAR) != NULL) {
 		subreaper++;
@@ -413,7 +413,7 @@ int parse_env() {
 
 
 #if HAS_SUBREAPER
-int register_subreaper () {
+int register_subreaper (void) {
 	if (subreaper > 0) {
 		if (prctl(PR_SET_CHILD_SUBREAPER, 1)) {
 			if (errno == EINVAL) {
@@ -431,7 +431,7 @@ int register_subreaper () {
 #endif
 
 
-void reaper_check () {
+void reaper_check (void) {
 	/* Check that we can properly reap zombies */
 #if HAS_SUBREAPER
 	int bit = 0;
