@@ -202,10 +202,15 @@ and ctrl-C it, nothing happens: SIGINT is sent to the 'sh' process,
 but that shell won't react to it while it is waiting for the 'sleep'
 to finish.
 
-With the `-g` option, Tini kills the child process group , so that
-every process in the group gets the signal. This corresponds more
-closely to what happens when you do ctrl-C etc. in a terminal: The
-signal is sent to the foreground process group.
+You can configure Tini to kill the child process group, so that every process
+in the group gets the signal, by either:
+
+  + Passing the `-g` argument to Tini (`tini -g -- ...`)
+  + Setting the environment variable `TINI_KILL_PROCESS_GROUP`
+    (e.g. `export TINI_KILL_PROCESS_GROUP=`).
+
+This corresponds more closely to what happens when you do ctrl-C etc. in a
+terminal: The signal is sent to the foreground process group.
 
     docker run --rm --entrypoint tini krallin/ubuntu-tini -g -- sh -c 'sleep 10'
 
