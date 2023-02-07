@@ -78,6 +78,32 @@ Arguments for Tini itself should be passed like `-v` in the following example:
 *NOTE: The binary linked above is a 64-bit dynamically-linked binary.*
 
 
+## Minimal Reproducible Example
+
+1. Save the content below in a Dockerfile
+
+```dockerfile
+FROM node:18.13-bullseye
+
+# Comment out the following three lines to see that you won't be able to stop the Node process
+# unless you close the terminal, ie. sending SIGINT (CRTL+C) won't stop the it
+ENV TINI_VERSION v0.19.0
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "--"]
+
+RUN echo "(function counter() { let count = 0; setInterval(() => { count++; console.log(count); }, 1000); })();" >> app.js
+CMD ["node", "app.js"]
+```
+
+2. Build and run the container using the following commands
+
+```sh
+docker build -t "tini-mre" .
+docker run --rm "tini-mre"
+```
+
+
 ### Signed binaries ###
 
 The `tini` and `tini-static` binaries are signed using the key `595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7`.
