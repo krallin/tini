@@ -6,7 +6,7 @@ set -o xtrace
 DEPS=(
   build-essential git gdb valgrind cmake rpm file
   libcap-dev python3-dev python3-pip python3-setuptools
-  hardening-includes gnupg
+  devscripts gnupg
 )
 
 case "${ARCH_SUFFIX-}" in
@@ -23,7 +23,7 @@ case "${ARCH_SUFFIX-}" in
 esac
 
 apt-get update
-apt-get install --no-install-recommends --yes "${DEPS[@]}"
+DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install --no-install-recommends --yes "${DEPS[@]}"
 rm -rf /var/lib/apt/lists/*
 
 python3 -m pip install --upgrade pip
