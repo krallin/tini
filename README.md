@@ -85,7 +85,7 @@ Arguments for Tini itself should be passed like `-v` in the following example:
 ```dockerfile
 FROM node:18.13-bullseye
 
-# Comment out the following three lines to see that you won't be able to stop the Node process
+# Comment out the following four lines to see that you won't be able to stop the Node process
 # unless you close the terminal, ie. sending SIGINT (CRTL+C) won't stop the it
 ENV TINI_VERSION v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
