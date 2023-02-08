@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/reboot.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -90,11 +91,11 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "p:hvwgle:s"
+#define OPT_STRING "p:hvwgle:sRS"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "p:hvwgle:"
+#define OPT_STRING "p:hvwgle:RS"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -110,6 +111,9 @@ static unsigned int parent_death_signal = 0;
 static unsigned int kill_process_group = 0;
 
 static unsigned int warn_on_reap = 0;
+
+static unsigned int reboot_on_exit = 0;
+static unsigned int sync_before_reboot = 0;
 
 static struct timespec ts = { .tv_sec = 1, .tv_nsec = 0 };
 
@@ -249,6 +253,8 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0 (can be repeated).\n");
 	fprintf(file, "  -l: Show license and exit.\n");
+	fprintf(file, "  -R: Call reboot(2) instead of exiting.\n");
+	fprintf(file, "  -S: Call sync(2) before reboot. If -R is not specified, this option is ignored.\n");
 #endif
 
 	fprintf(file, "\n");
@@ -360,6 +366,14 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				print_license(stdout);
 				*parse_fail_exitcode_ptr = 0;
 				return 1;
+
+			case 'R':
+				reboot_on_exit++;
+				break;
+
+			case 'S':
+				sync_before_reboot++;
+				break;
 
 			case '?':
 				print_usage(name, stderr);
@@ -604,7 +618,7 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 }
 
 
-int main(int argc, char *argv[]) {
+int tini(int argc, char *argv[]) {
 	pid_t child_pid;
 
 	// Those are passed to functions to get an exitcode back.
@@ -677,5 +691,22 @@ int main(int argc, char *argv[]) {
 			PRINT_TRACE("Exiting: child has exited");
 			return child_exitcode;
 		}
+	}
+}
+
+
+int main(int argc, char *argv[]) {
+	int exit_status = tini(argc, argv);
+	if (reboot_on_exit) {
+		if (sync_before_reboot) {
+			sync();
+		}
+		if (exit_status) {
+			PRINT_WARNING("%s exit status: %d",
+				      argv[0], exit_status);
+		}
+		return reboot(RB_AUTOBOOT);
+	} else {
+		return exit_status;
 	}
 }
