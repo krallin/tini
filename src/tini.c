@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <libgen.h>
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
@@ -224,14 +225,19 @@ int spawn(const signal_configuration_t* const sigconf_ptr, char* const argv[], i
 }
 
 void print_usage(char* const name, FILE* const file) {
-	fprintf(file, "%s (%s)\n", basename(name), TINI_VERSION_STRING);
+	char *dirc, *bname;
+
+	dirc = strdup(name);
+	bname = basename(dirc);
+
+	fprintf(file, "%s (%s)\n", bname, TINI_VERSION_STRING);
 
 #if TINI_MINIMAL
-	fprintf(file, "Usage: %s PROGRAM [ARGS] | --version\n\n", basename(name));
+	fprintf(file, "Usage: %s PROGRAM [ARGS] | --version\n\n", bname);
 #else
-	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS] | --version\n\n", basename(name));
+	fprintf(file, "Usage: %s [OPTIONS] PROGRAM -- [ARGS] | --version\n\n", bname);
 #endif
-	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", basename(name));
+	fprintf(file, "Execute a program under the supervision of a valid init process (%s)\n\n", bname);
 
 	fprintf(file, "Command line options:\n\n");
 
@@ -261,6 +267,7 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  %s: Send signals to the child's process group.\n", KILL_PROCESS_GROUP_GROUP_ENV_VAR);
 
 	fprintf(file, "\n");
+	free(dirc);
 }
 
 void print_license(FILE* const file) {
