@@ -45,6 +45,8 @@
 #define STATUS_MAX 255
 #define STATUS_MIN 0
 
+#define RESPAWN_CHILD -2
+
 typedef struct {
    sigset_t* const sigmask_ptr;
    struct sigaction* const sigttin_action_ptr;
@@ -91,11 +93,11 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #ifdef PR_SET_CHILD_SUBREAPER
 #define HAS_SUBREAPER 1
-#define OPT_STRING "p:hvwgle:s"
+#define OPT_STRING "p:hvwgle:r:t:s"
 #define SUBREAPER_ENV_VAR "TINI_SUBREAPER"
 #else
 #define HAS_SUBREAPER 0
-#define OPT_STRING "p:hvwgle:"
+#define OPT_STRING "p:hvwgle:r:t:"
 #endif
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
@@ -128,6 +130,10 @@ To fix the problem, "
 "set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
 #endif
 "run Tini as PID 1.";
+
+static unsigned int restart_signal = 0;
+static unsigned int child_term_signal = SIGTERM;
+static bool is_restarting = false;
 
 int restore_signals(const signal_configuration_t* const sigconf_ptr) {
 	if (sigprocmask(SIG_SETMASK, sigconf_ptr->sigmask_ptr, NULL)) {
@@ -254,6 +260,9 @@ void print_usage(char* const name, FILE* const file) {
 	fprintf(file, "  -w: Print a warning when processes are getting reaped.\n");
 	fprintf(file, "  -g: Send signals to the child's process group.\n");
 	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0 (can be repeated).\n");
+	fprintf(file, "  -r RESTART_SIGNAL: Restart(terminate and start) child process on RESTART_SIGNAL, e.g. \"-r SIGUSR1\".\n");
+	fprintf(file, "  -t CHILD_TERM_SIGNAL: Signal to terminate the child process for a restart, defaults to SIGTERM, e.g. \"-t SIGTERM\".\n");
+	fprintf(file, "  -e EXIT_CODE: Remap EXIT_CODE (from 0 to 255) to 0 (can be repeated).\n");
 	fprintf(file, "  -l: Show license and exit.\n");
 #endif
 
@@ -280,13 +289,13 @@ void print_license(FILE* const file) {
     }
 }
 
-int set_pdeathsig(char* const arg) {
+int set_signal_number(char* const signal_name, unsigned int* signal_number) {
 	size_t i;
 
 	for (i = 0; i < ARRAY_LEN(signal_names); i++) {
-		if (strcmp(signal_names[i].name, arg) == 0) {
+		if (strcmp(signal_names[i].name, signal_name) == 0) {
 			/* Signals start at value "1" */
-			parent_death_signal = signal_names[i].number;
+			*signal_number = signal_names[i].number;
 			return 0;
 		}
 	}
@@ -336,8 +345,30 @@ int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[
 				break;
 #endif
 			case 'p':
-				if (set_pdeathsig(optarg)) {
+				if (set_signal_number(optarg, &parent_death_signal)) {
 					PRINT_FATAL("Not a valid option for -p: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+				break;
+
+			case 'r':
+				if (set_signal_number(optarg, &restart_signal)) {
+					PRINT_FATAL("Not a valid option for -r: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+
+				if (restart_signal == SIGCHLD) {
+					PRINT_FATAL("SIGCHLD not a valid option for -r: %s", optarg);
+					*parse_fail_exitcode_ptr = 1;
+					return 1;
+				}
+				break;
+
+			case 't':
+				if (set_signal_number(optarg, &child_term_signal)) {
+					PRINT_FATAL("Not a valid option for -t: %s", optarg);
 					*parse_fail_exitcode_ptr = 1;
 					return 1;
 				}
@@ -505,6 +536,10 @@ int configure_signals(sigset_t* const parent_sigset_ptr, const signal_configurat
 	return 0;
 }
 
+bool is_restart_enabled() {
+	return restart_signal != 0;
+}
+
 int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const child_pid) {
 	siginfo_t sig;
 
@@ -528,6 +563,17 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 				PRINT_DEBUG("Received SIGCHLD");
 				break;
 			default:
+					if (restart_signal == (unsigned)sig.si_signo && is_restart_enabled()) {
+					PRINT_DEBUG("Received process restart signal: %d", sig.si_signo);
+					// Shutdown the child process.
+					// Success full termination will be known when corresponding
+					// SIGCHLD is received.
+					PRINT_DEBUG("Terminating child process with pid %d", child_pid);
+					kill(child_pid, child_term_signal);
+					is_restarting = true;
+					break;
+				}
+
 				PRINT_DEBUG("Passing signal: '%s'", strsignal(sig.si_signo));
 				/* Forward anything else */
 				if (kill(kill_process_group ? -child_pid : child_pid, sig.si_signo)) {
@@ -548,6 +594,8 @@ int wait_and_forward_signal(sigset_t const* const parent_sigset_ptr, pid_t const
 int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 	pid_t current_pid;
 	int current_status;
+
+	*child_exitcode_ptr = -1;
 
 	while (1) {
 		current_pid = waitpid(-1, &current_status, WNOHANG);
@@ -595,6 +643,14 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 					if (INT32_BITFIELD_TEST(expect_status, *child_exitcode_ptr)) {
 						*child_exitcode_ptr = 0;
 					}
+
+					if (is_restarting && *child_exitcode_ptr == 0) {
+						/* The child process exited normally with a success exit
+						 * code 0 and we are restarting. Indicate repsawn of the child.
+						 */
+						*child_exitcode_ptr = RESPAWN_CHILD;
+					}
+					is_restarting = false;
 				} else if (warn_on_reap > 0) {
 					PRINT_WARNING("Reaped zombie process with pid=%i", current_pid);
 				}
@@ -609,7 +665,6 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 
 	return 0;
 }
-
 
 int main(int argc, char *argv[]) {
 	pid_t child_pid;
@@ -667,7 +722,10 @@ int main(int argc, char *argv[]) {
 	if (spawn_ret) {
 		return spawn_ret;
 	}
-	free(child_args_ptr);
+
+	if (!is_restart_enabled()) {
+		free(child_args_ptr);
+	}
 
 	while (1) {
 		/* Wait for one signal, and forward it */
@@ -680,8 +738,13 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
-		if (child_exitcode != -1) {
-			PRINT_TRACE("Exiting: child has exited");
+		if (is_restart_enabled() && child_exitcode == RESPAWN_CHILD) {
+			spawn_ret = spawn(&child_sigconf, *child_args_ptr, &child_pid);
+			if (spawn_ret) {
+				return spawn_ret;
+			}
+		} else if (child_exitcode != -1) {
+			PRINT_TRACE("Exiting: child has exited %d", child_exitcode);
 			return child_exitcode;
 		}
 	}
