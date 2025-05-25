@@ -1,4 +1,6 @@
-FROM ubuntu:xenial
+FROM ubuntu:focal
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 ARG ARCH_SUFFIX
 
