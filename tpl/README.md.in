@@ -131,6 +131,13 @@ On Debian (Buster or newer), you can use the following command to install Tini:
 Note that this installs `/usr/bin/tini` (and `/usr/bin/tini-static`), not `/tini`.
 
 
+### macOS ###
+
+On macOS, you can install Tini using [Homebrew](https://brew.sh):
+
+    brew install Tini
+
+
 ### Arch Linux ###
 
 On Arch Linux, there is a package available on the [AUR](https://wiki.archlinux.org/index.php/Arch_User_Repository).
