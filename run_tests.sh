@@ -1,10 +1,8 @@
 #!/bin/bash
 set -o errexit
 set -o nounset
-
-REL_HERE=$(dirname "${BASH_SOURCE}")
+REL_HERE=$(dirname "${BASH_SOURCE[0]}")
 HERE=$(cd "${REL_HERE}"; pwd)
-
 for i in $(seq 0 1); do
   export FORCE_SUBREAPER="${i}"
   echo "Testing with FORCE_SUBREAPER=${FORCE_SUBREAPER}"
