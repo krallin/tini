@@ -648,7 +648,7 @@ int main(int argc, char *argv[]) {
 
 	/* Trigger signal on this process when the parent process exits. */
 	if (parent_death_signal && prctl(PR_SET_PDEATHSIG, parent_death_signal)) {
-		PRINT_FATAL("Failed to set up parent death signal");
+		PRINT_FATAL("Failed to set up parent death signal: %s", strerror(errno));
 		return 1;
 	 }
 
