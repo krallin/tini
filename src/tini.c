@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <libgen.h>
+#include <stdint.h>
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
@@ -37,7 +38,6 @@
 
 #define ARRAY_LEN(x)  (sizeof(x) / sizeof((x)[0]))
 
-#define INT32_BITFIELD_SET(F, i)     ( F[(i / 32)] |=  (1 << (i % 32)) )
 #define INT32_BITFIELD_CLEAR(F, i)   ( F[(i / 32)] &= ~(1 << (i % 32)) )
 #define INT32_BITFIELD_TEST(F, i)    ( F[(i / 32)] &   (1 << (i % 32)) )
 #define INT32_BITFIELD_CHECK_BOUNDS(F, i) do {  assert(i >= 0); assert(ARRAY_LEN(F) > (uint) (i / 32)); } while(0)
@@ -84,6 +84,10 @@ static const struct {
    { "SIGWINCH", SIGWINCH },
    { "SIGSYS", SIGSYS },
 };
+
+static inline void int32_bitfield_set(uint32_t *F, unsigned int i) {
+    F[i / 32] |= (1U << (i % 32));
+}
 
 static unsigned int verbosity = DEFAULT_VERBOSITY;
 
@@ -308,7 +312,7 @@ int add_expect_status(char* arg) {
 	}
 
 	INT32_BITFIELD_CHECK_BOUNDS(expect_status, status);
-	INT32_BITFIELD_SET(expect_status, status);
+	int32_bitfield_set(expect_status, status);
 	return 0;
 }
 
