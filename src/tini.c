@@ -164,7 +164,7 @@ int isolate_child(void) {
 	// parent the foreground process group, and the actual child ends up...
 	// in the background!)
 	if (tcsetpgrp(STDIN_FILENO, getpgrp())) {
-		if (errno == ENOTTY) {
+		if (errno == ENOTTY || errno == EBADF) {
 			PRINT_DEBUG("tcsetpgrp failed: no tty (ok to proceed)");
 		} else if (errno == ENXIO) {
 			// can occur on lx-branded zones
