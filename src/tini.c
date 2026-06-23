@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <libgen.h>
+#include <stdint.h>
 
 #include "tiniConfig.h"
 #include "tiniLicense.h"
