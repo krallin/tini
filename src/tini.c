@@ -7,7 +7,9 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <string.h>
 #include <time.h>
 #include <stdio.h>
@@ -19,19 +21,15 @@
 #include "tiniConfig.h"
 #include "tiniLicense.h"
 
+#define PRINT_FATAL(...)                         print_log(stderr, "FATAL", __VA_ARGS__);
+#define PRINT_WARNING(...)  if (verbosity > 0) { print_log(stderr, "WARN", __VA_ARGS__); }
+#define PRINT_INFO(...)     if (verbosity > 1) { print_log(stdout, "INFO", __VA_ARGS__); }
+#define PRINT_DEBUG(...)    if (verbosity > 2) { print_log(stdout, "DEBUG", __VA_ARGS__); }
+#define PRINT_TRACE(...)    if (verbosity > 3) { print_log(stdout, "TRACE", __VA_ARGS__); }
+
 #if TINI_MINIMAL
-#define PRINT_FATAL(...)                         fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
-#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
-#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
 #define DEFAULT_VERBOSITY 0
 #else
-#define PRINT_FATAL(...)                         fprintf(stderr, "[FATAL tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n");
-#define PRINT_WARNING(...)  if (verbosity > 0) { fprintf(stderr, "[WARN  tini (%i)] ", getpid()); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); }
-#define PRINT_INFO(...)     if (verbosity > 1) { fprintf(stdout, "[INFO  tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_DEBUG(...)    if (verbosity > 2) { fprintf(stdout, "[DEBUG tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
-#define PRINT_TRACE(...)    if (verbosity > 3) { fprintf(stdout, "[TRACE tini (%i)] ", getpid()); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); }
 #define DEFAULT_VERBOSITY 1
 #endif
 
@@ -86,6 +84,7 @@ static const struct {
 };
 
 static unsigned int verbosity = DEFAULT_VERBOSITY;
+static unsigned int log_json = 0;
 
 static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
@@ -100,6 +99,7 @@ static int32_t expect_status[(STATUS_MAX - STATUS_MIN + 1) / 32];
 
 #define VERBOSITY_ENV_VAR "TINI_VERBOSITY"
 #define KILL_PROCESS_GROUP_GROUP_ENV_VAR "TINI_KILL_PROCESS_GROUP"
+#define LOG_FORMAT_ENV_VAR "TINI_LOG_FORMAT"
 
 #define TINI_VERSION_STRING "tini version " TINI_VERSION TINI_GIT
 
@@ -128,6 +128,99 @@ To fix the problem, "
 "set the environment variable " SUBREAPER_ENV_VAR " to register Tini as a child subreaper, or "
 #endif
 "run Tini as PID 1.";
+
+void print_log(FILE* const file, const char* const level, const char* const format, ...) __attribute__ ((format (printf, 3, 4)));
+
+size_t utf8_sequence_length(const unsigned char* const c) {
+	size_t length, i;
+	unsigned char low = 0x80, high = 0xBF;
+
+	if (c[0] >= 0xC2 && c[0] <= 0xDF) {
+		length = 2;
+	} else if (c[0] >= 0xE0 && c[0] <= 0xEF) {
+		length = 3;
+		low = (c[0] == 0xE0) ? 0xA0 : 0x80;
+		high = (c[0] == 0xED) ? 0x9F : 0xBF;
+	} else if (c[0] >= 0xF0 && c[0] <= 0xF4) {
+		length = 4;
+		low = (c[0] == 0xF0) ? 0x90 : 0x80;
+		high = (c[0] == 0xF4) ? 0x8F : 0xBF;
+	} else {
+		return 0;
+	}
+
+	for (i = 1; i < length; i++) {
+		if (c[i] < low || c[i] > high) {
+			return 0;
+		}
+		low = 0x80;
+		high = 0xBF;
+	}
+
+	return length;
+}
+
+void print_json_line(FILE* const file, const char* const level, const char* const message) {
+	char line[PIPE_BUF];
+	size_t used = snprintf(line, sizeof line, "{\"level\":\"%s\",\"program\":\"tini\",\"pid\":%i,\"message\":\"", level, getpid());
+	const unsigned char* c = (const unsigned char*) message;
+	size_t length;
+
+	while (*c != '\0') {
+		if (sizeof line - used < 16) {
+			fwrite(line, 1, used, file);
+			used = 0;
+		}
+		length = 1;
+		switch (*c) {
+			case '"':  used += sprintf(line + used, "\\\""); break;
+			case '\\': used += sprintf(line + used, "\\\\"); break;
+			case '\b': used += sprintf(line + used, "\\b"); break;
+			case '\f': used += sprintf(line + used, "\\f"); break;
+			case '\n': used += sprintf(line + used, "\\n"); break;
+			case '\r': used += sprintf(line + used, "\\r"); break;
+			case '\t': used += sprintf(line + used, "\\t"); break;
+			default:
+				if (*c >= 0x80) {
+					length = utf8_sequence_length(c);
+				}
+				if (*c < 0x20 || length == 0) {
+					used += sprintf(line + used, "\\u%04x", *c);
+					length = 1;
+				} else {
+					memcpy(line + used, c, length);
+					used += length;
+				}
+		}
+		c += length;
+	}
+
+	used += sprintf(line + used, "\"}\n");
+	fwrite(line, 1, used, file);
+}
+
+void print_log(FILE* const file, const char* const level, const char* const format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	if (log_json) {
+		char* message;
+		if (vasprintf(&message, format, args) < 0) {
+			print_json_line(file, level, format);
+		} else {
+			print_json_line(file, level, message);
+			free(message);
+		}
+	} else {
+#ifndef TINI_MINIMAL
+		fprintf(file, "[%-5s tini (%i)] ", level, getpid());
+#endif
+		vfprintf(file, format, args);
+		fprintf(file, "\n");
+	}
+
+	va_end(args);
+}
 
 int restore_signals(const signal_configuration_t* const sigconf_ptr) {
 	if (sigprocmask(SIG_SETMASK, sigconf_ptr->sigmask_ptr, NULL)) {
@@ -265,6 +358,7 @@ void print_usage(char* const name, FILE* const file) {
 #endif
 	fprintf(file, "  %s: Set the verbosity level (default: %d).\n", VERBOSITY_ENV_VAR, DEFAULT_VERBOSITY);
 	fprintf(file, "  %s: Send signals to the child's process group.\n", KILL_PROCESS_GROUP_GROUP_ENV_VAR);
+	fprintf(file, "  %s: Set the log format, text or json (default: text).\n", LOG_FORMAT_ENV_VAR);
 
 	fprintf(file, "\n");
 	free(dirc);
@@ -310,6 +404,19 @@ int add_expect_status(char* arg) {
 	INT32_BITFIELD_CHECK_BOUNDS(expect_status, status);
 	INT32_BITFIELD_SET(expect_status, status);
 	return 0;
+}
+
+int parse_log_format(void) {
+	char* env_log_format = getenv(LOG_FORMAT_ENV_VAR);
+	if (env_log_format == NULL || strcmp(env_log_format, "text") == 0) {
+		return 0;
+	}
+	if (strcmp(env_log_format, "json") == 0) {
+		log_json = 1;
+		return 0;
+	}
+	PRINT_FATAL("Not a valid value for %s: %s", LOG_FORMAT_ENV_VAR, env_log_format);
+	return 1;
 }
 
 int parse_args(const int argc, char* const argv[], char* (**child_args_ptr_ptr)[], int* const parse_fail_exitcode_ptr) {
@@ -617,6 +724,11 @@ int main(int argc, char *argv[]) {
 	// Those are passed to functions to get an exitcode back.
 	int child_exitcode = -1;  // This isn't a valid exitcode, and lets us tell whether the child has exited.
 	int parse_exitcode = 1;   // By default, we exit with 1 if parsing fails.
+
+	/* Parse the log format first, so that every line uses it */
+	if (parse_log_format()) {
+		return 1;
+	}
 
 	/* Parse command line arguments */
 	char* (*child_args_ptr)[];
