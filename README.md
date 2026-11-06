@@ -155,6 +155,29 @@ The `-v` argument can be used for extra verbose output (you can pass it up to
 3 times, e.g. `-vvv`).
 
 
+### Log format ###
+
+By default, Tini prints its messages as text, e.g.
+`[FATAL tini (7)] exec foo failed: No such file or directory`.
+
+Setting the environment variable `TINI_LOG_FORMAT` to `json` makes Tini print
+each message as one JSON object per line instead, at the same verbosity and on
+the same stream:
+
+    {"level":"FATAL","program":"tini","pid":7,"message":"exec foo failed: No such file or directory"}
+
+`level` is one of `FATAL`, `WARN`, `INFO`, `DEBUG` or `TRACE`. Quotes,
+backslashes and control characters in the message are escaped, and valid UTF-8
+is passed through unchanged. Each byte that is not part of valid UTF-8 (e.g. in
+a program name) is written as an escape from `\u0080` to `\u00ff`, so every
+line is valid JSON. Since valid characters are never escaped, each such escape
+in the line as written stands for exactly one original byte.
+
+`TINI_LOG_FORMAT=text` keeps the default format, and any other value makes
+Tini exit with status 1. The usage, version and license output are not
+affected.
+
+
 ### Subreaping ###
 
 By default, Tini needs to run as PID 1 so that it can reap zombies (by
